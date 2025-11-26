@@ -8,9 +8,7 @@ import Statistics from './components/Statistics';
 import SplashScreen from './components/SplashScreen';
 import Logo from './components/Logo';
 
-const API_URL = process.env.NODE_ENV === 'production' 
-  ? '/api'  // Use relative path in production
-  : 'http://localhost:5000/api';  // Use localhost in development;
+const API_URL = process.env.REACT_APP_API_URL || '/api';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('generate');
