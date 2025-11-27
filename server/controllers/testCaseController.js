@@ -26,15 +26,20 @@ exports.generateTestCases = async (req, res) => {
       return res.status(400).json({ error: 'Acceptance criteria must be at least 10 characters' });
     }
 
+    // Check if "All" mode
+    const isAllMode = scenarioType === 'All';
+
     console.log('🤖 Generating test cases with Groq AI...');
+    console.log(`📍 Mode: ${isAllMode ? 'ALL (Comprehensive)' : scenarioType}`);
     console.log(`📍 Using: Area Path="${areaPath}", Assigned To="${assignedTo}", State="${state}"`);
     
     let generatedTestCases;
     try {
       generatedTestCases = await generateTestCasesWithGroq(acceptanceCriteria, {
         scenarioType,
-        numberOfScenarios: parseInt(numberOfScenarios),
-        numberOfSteps: parseInt(numberOfSteps),
+        // For "All" mode, these will be ignored by the service
+        numberOfScenarios: isAllMode ? 'auto' : parseInt(numberOfScenarios),
+        numberOfSteps: isAllMode ? 'auto' : parseInt(numberOfSteps),
         environment,
         platforms,
         areaPath,
@@ -44,7 +49,7 @@ exports.generateTestCases = async (req, res) => {
     } catch (groqError) {
       console.error('❌ Groq generation failed:', groqError.message);
       return res.status(500).json({ 
-        error: 'Failed to generate test cases. Please try again with different criteria or fewer scenarios.',
+        error: 'Failed to generate test cases. Please try again with different criteria.',
         details: groqError.message 
       });
     }
@@ -59,7 +64,7 @@ exports.generateTestCases = async (req, res) => {
     for (const tcData of generatedTestCases) {
       const testCase = new TestCase({
         ...tcData,
-        scenarioType,
+        scenarioType: tcData.scenarioType || scenarioType,
         priority,
         environment,
         platforms,
@@ -71,17 +76,37 @@ exports.generateTestCases = async (req, res) => {
       savedTestCases.push(saved);
     }
 
-    const totalRowsPerScenario = 1 + parseInt(numberOfSteps);
-    const actualScenarios = Math.floor(savedTestCases.length / totalRowsPerScenario);
+    // Calculate scenarios - for "All" mode, count unique titles
+    let actualScenarios;
+    if (isAllMode) {
+      actualScenarios = savedTestCases.filter(tc => tc.workItemType === 'Test Case').length;
+    } else {
+      const totalRowsPerScenario = 1 + parseInt(numberOfSteps);
+      actualScenarios = Math.floor(savedTestCases.length / totalRowsPerScenario);
+    }
 
     console.log(`💾 Saved ${savedTestCases.length} test case rows (${actualScenarios} scenarios)`);
 
+    // Group by scenario type for "All" mode
+    let scenarioBreakdown = {};
+    if (isAllMode) {
+      savedTestCases.forEach(tc => {
+        if (tc.workItemType === 'Test Case' && tc.scenarioType) {
+          scenarioBreakdown[tc.scenarioType] = (scenarioBreakdown[tc.scenarioType] || 0) + 1;
+        }
+      });
+    }
+
     res.status(201).json({
       success: true,
-      message: `Generated ${actualScenarios} test case scenarios with ${savedTestCases.length} total rows`,
+      message: isAllMode 
+        ? `Generated comprehensive test coverage: ${actualScenarios} scenarios across all types`
+        : `Generated ${actualScenarios} test case scenarios with ${savedTestCases.length} total rows`,
       testCases: savedTestCases,
       count: savedTestCases.length,
-      scenarios: actualScenarios
+      scenarios: actualScenarios,
+      isComprehensive: isAllMode,
+      scenarioBreakdown: isAllMode ? scenarioBreakdown : undefined
     });
 
   } catch (error) {

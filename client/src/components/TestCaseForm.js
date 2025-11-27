@@ -17,6 +17,9 @@ function TestCaseForm({ onGenerate, loading }) {
 
   const [error, setError] = useState('');
 
+  // Check if "All" mode is selected
+  const isAllMode = formData.scenarioType === 'All';
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -54,27 +57,37 @@ function TestCaseForm({ onGenerate, loading }) {
       return;
     }
 
-    if (formData.numberOfScenarios < 1) {
-      setError('Number of test cases must be at least 1');
-      return;
+    // Skip validation for numberOfScenarios and numberOfSteps if "All" mode
+    if (!isAllMode) {
+      if (formData.numberOfScenarios < 1) {
+        setError('Number of test cases must be at least 1');
+        return;
+      }
+
+      if (formData.numberOfSteps < 1) {
+        setError('Number of steps must be at least 1');
+        return;
+      }
+
+      if (formData.numberOfScenarios > 50) {
+        setError('Please limit to 50 test cases per generation for optimal performance');
+        return;
+      }
+
+      if (formData.numberOfSteps > 20) {
+        setError('Please limit to 20 steps per test case for optimal performance');
+        return;
+      }
     }
 
-    if (formData.numberOfSteps < 1) {
-      setError('Number of steps must be at least 1');
-      return;
-    }
+    // Prepare data for submission
+    const submitData = {
+      ...formData,
+      numberOfScenarios: isAllMode ? 'auto' : formData.numberOfScenarios,
+      numberOfSteps: isAllMode ? 'auto' : formData.numberOfSteps
+    };
 
-    if (formData.numberOfScenarios > 50) {
-      setError('Please limit to 50 test cases per generation for optimal performance');
-      return;
-    }
-
-    if (formData.numberOfSteps > 20) {
-      setError('Please limit to 20 steps per test case for optimal performance');
-      return;
-    }
-
-    const result = await onGenerate(formData);
+    const result = await onGenerate(submitData);
     
     if (result && !result.success) {
       setError(result.message);
@@ -98,14 +111,19 @@ function TestCaseForm({ onGenerate, loading }) {
         <div className="form-group">
           <label htmlFor="acceptanceCriteria">
             Acceptance Criteria *
-            <span className="label-hint">Describe what needs to be tested (minimum 10 characters)</span>
+            <span className="label-hint">
+              {isAllMode 
+                ? 'AI will analyze every word and generate all possible test scenarios'
+                : 'Describe what needs to be tested (minimum 10 characters)'
+              }
+            </span>
           </label>
           <textarea
             id="acceptanceCriteria"
             name="acceptanceCriteria"
             value={formData.acceptanceCriteria}
             onChange={handleChange}
-            placeholder="Example: User should be able to login with valid email and password. The system should validate credentials and redirect to dashboard upon successful authentication."
+            placeholder="Example: Admin should be able to set release dates for individual course modules through the Admin App. Students should not be able to see or access unreleased modules. Modules should become visible only when the release date is reached AND previous modules are completed. The system should handle timezone differences correctly."
             rows="5"
             required
           />
@@ -115,7 +133,12 @@ function TestCaseForm({ onGenerate, loading }) {
           <div className="form-group">
             <label htmlFor="scenarioType">
               Scenario Type
-              <span className="label-hint">Type of test scenario</span>
+              <span className="label-hint">
+                {isAllMode 
+                  ? 'AI will generate Positive, Negative, Boundary & Edge cases'
+                  : 'Type of test scenario'
+                }
+              </span>
             </label>
             <select
               id="scenarioType"
@@ -123,6 +146,7 @@ function TestCaseForm({ onGenerate, loading }) {
               value={formData.scenarioType}
               onChange={handleChange}
             >
+              <option value="All">🔄 All (Comprehensive Coverage)</option>
               <option value="Positive">✓ Positive</option>
               <option value="Negative">✗ Negative</option>
               <option value="Boundary">⚡ Boundary</option>
@@ -152,34 +176,50 @@ function TestCaseForm({ onGenerate, loading }) {
           <div className="form-group">
             <label htmlFor="numberOfScenarios">
               Number of Test Cases
-              <span className="label-hint">How many test case scenarios to generate (max 50 recommended)</span>
+              <span className="label-hint">
+                {isAllMode 
+                  ? 'Automatically determined by AI based on acceptance criteria'
+                  : 'How many test case scenarios to generate (max 50 recommended)'
+                }
+              </span>
             </label>
             <input
               type="number"
               id="numberOfScenarios"
               name="numberOfScenarios"
-              value={formData.numberOfScenarios}
+              value={isAllMode ? '' : formData.numberOfScenarios}
               onChange={handleChange}
               min="1"
               max="50"
-              required
+              required={!isAllMode}
+              disabled={isAllMode}
+              placeholder={isAllMode ? 'Auto (AI decides)' : ''}
+              className={isAllMode ? 'disabled-input' : ''}
             />
           </div>
 
           <div className="form-group">
             <label htmlFor="numberOfSteps">
               Steps per Test Case
-              <span className="label-hint">Number of steps in each test case (max 20 recommended)</span>
+              <span className="label-hint">
+                {isAllMode 
+                  ? 'Automatically determined by AI based on complexity'
+                  : 'Number of steps in each test case (max 20 recommended)'
+                }
+              </span>
             </label>
             <input
               type="number"
               id="numberOfSteps"
               name="numberOfSteps"
-              value={formData.numberOfSteps}
+              value={isAllMode ? '' : formData.numberOfSteps}
               onChange={handleChange}
               min="1"
               max="20"
-              required
+              required={!isAllMode}
+              disabled={isAllMode}
+              placeholder={isAllMode ? 'Auto (AI decides)' : ''}
+              className={isAllMode ? 'disabled-input' : ''}
             />
           </div>
         </div>
@@ -296,22 +336,65 @@ function TestCaseForm({ onGenerate, loading }) {
           </div>
         </div>
 
-        <button 
-          type="submit" 
-          className="submit-btn"
-          disabled={loading}
-        >
-          {loading ? (
-            <>
-              <span className="spinner"></span>
-              Generating Test Cases...
-            </>
-          ) : (
-            <>
-              ✨ Generate Test Cases
-            </>
-          )}
-        </button>
+        {isAllMode && (
+          <div className="all-mode-notice">
+            <span className="notice-icon">🤖</span>
+            <div className="notice-content">
+              <strong>Comprehensive Analysis Mode</strong>
+              <p>AI will deeply analyze your acceptance criteria and generate all possible test scenarios including Positive, Negative, Boundary, and Edge cases. The number of test cases and steps will be automatically determined based on the complexity of your requirements.</p>
+            </div>
+          </div>
+        )}
+
+        {/* New Redesigned Generate Button */}
+        <div className="generate-button-container">
+          <button 
+            type="submit" 
+            className={`generate-btn ${loading ? 'loading' : ''} ${isAllMode ? 'all-mode' : ''}`}
+            disabled={loading}
+          >
+            <div className="btn-background">
+              <div className="btn-glow"></div>
+            </div>
+            <div className="btn-content">
+              {loading ? (
+                <>
+                  <div className="loading-spinner">
+                    <div className="spinner-ring"></div>
+                    <div className="spinner-ring"></div>
+                    <div className="spinner-ring"></div>
+                  </div>
+                  <div className="btn-text-container">
+                    <span className="btn-text-main">
+                      {isAllMode ? 'Analyzing & Generating...' : 'Generating Test Cases...'}
+                    </span>
+                    <span className="btn-text-sub">Please wait while AI processes your request</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="btn-icon-container">
+                    <span className="btn-icon-main">🚀</span>
+                    <span className="btn-icon-sparkle">✨</span>
+                  </div>
+                  <div className="btn-text-container">
+                    <span className="btn-text-main">
+                      {isAllMode ? 'Generate All Test Cases' : 'Generate Test Cases'}
+                    </span>
+                    <span className="btn-text-sub">
+                      {isAllMode ? 'Comprehensive AI-Powered Analysis' : 'Powered by Groq AI'}
+                    </span>
+                  </div>
+                  <div className="btn-arrow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                  </div>
+                </>
+              )}
+            </div>
+          </button>
+        </div>
       </form>
     </div>
   );
