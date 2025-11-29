@@ -1,9 +1,14 @@
 const TestCase = require('../models/TestCase');
-const { generateTestCasesWithGroq } = require('../services/groqService');
+const { generateTestCasesWithGroq, generateComprehensiveTestCases, getRateLimitStatus: getGroqRateLimitStatus } = require('../services/groqService');
 
+// @desc    Generate test cases using AI
+// @route   POST /api/testcases/generate
+// @access  Public
 exports.generateTestCases = async (req, res) => {
   try {
-    console.log('📨 Received request:', req.body);
+    console.log('═══════════════════════════════════════════════════════════');
+    console.log('📨 Generate Test Cases Request');
+    console.log('═══════════════════════════════════════════════════════════');
 
     const {
       acceptanceCriteria,
@@ -18,6 +23,23 @@ exports.generateTestCases = async (req, res) => {
       areaPath = 'Subscription/Billing/Data'
     } = req.body;
 
+    // Check if comprehensive mode (All scenarios)
+    const isComprehensiveMode = scenarioType === 'All';
+
+    console.log('📋 Parameters:', {
+      scenarioType,
+      isComprehensiveMode,
+      numberOfScenarios: isComprehensiveMode ? 'auto' : numberOfScenarios,
+      numberOfSteps: isComprehensiveMode ? 'auto' : numberOfSteps,
+      priority,
+      environment,
+      areaPath,
+      assignedTo,
+      state,
+      criteriaLength: acceptanceCriteria?.length || 0
+    });
+
+    // Validation
     if (!acceptanceCriteria || acceptanceCriteria.trim().length === 0) {
       return res.status(400).json({ error: 'Acceptance criteria is required' });
     }
@@ -26,40 +48,59 @@ exports.generateTestCases = async (req, res) => {
       return res.status(400).json({ error: 'Acceptance criteria must be at least 10 characters' });
     }
 
-    // Check if "All" mode
-    const isAllMode = scenarioType === 'All';
-
     console.log('🤖 Generating test cases with Groq AI...');
-    console.log(`📍 Mode: ${isAllMode ? 'ALL (Comprehensive)' : scenarioType}`);
-    console.log(`📍 Using: Area Path="${areaPath}", Assigned To="${assignedTo}", State="${state}"`);
     
     let generatedTestCases;
     try {
-      generatedTestCases = await generateTestCasesWithGroq(acceptanceCriteria, {
-        scenarioType,
-        // For "All" mode, these will be ignored by the service
-        numberOfScenarios: isAllMode ? 'auto' : parseInt(numberOfScenarios),
-        numberOfSteps: isAllMode ? 'auto' : parseInt(numberOfSteps),
-        environment,
-        platforms,
-        areaPath,
-        assignedTo,
-        state
-      });
+      if (isComprehensiveMode) {
+        // Use comprehensive generation that analyzes all points
+        console.log('🎯 Comprehensive Mode: Analyzing all acceptance criteria points...');
+        generatedTestCases = await generateComprehensiveTestCases(acceptanceCriteria, {
+          priority,
+          environment,
+          platforms,
+          areaPath,
+          assignedTo,
+          state
+        });
+      } else {
+        // Use standard generation
+        generatedTestCases = await generateTestCasesWithGroq(acceptanceCriteria, {
+          scenarioType,
+          numberOfScenarios: parseInt(numberOfScenarios),
+          numberOfSteps: parseInt(numberOfSteps),
+          environment,
+          platforms,
+          areaPath,
+          assignedTo,
+          state
+        });
+      }
     } catch (groqError) {
       console.error('❌ Groq generation failed:', groqError.message);
+      
+      // Check if it's a rate limit error
+      if (groqError.message.includes('Rate limit')) {
+        return res.status(429).json({ 
+          error: groqError.message,
+          isRateLimitError: true
+        });
+      }
+      
       return res.status(500).json({ 
-        error: 'Failed to generate test cases. Please try again with different criteria.',
+        error: 'Failed to generate test cases. Please try again.',
         details: groqError.message 
       });
     }
 
     if (!generatedTestCases || generatedTestCases.length === 0) {
+      console.error('❌ No test cases generated');
       return res.status(500).json({ error: 'No test cases were generated. Please try again.' });
     }
 
-    console.log(`✅ Groq generated ${generatedTestCases.length} test case rows`);
+    console.log(`✅ Generated ${generatedTestCases.length} test case rows`);
 
+    // Save to in-memory storage
     const savedTestCases = [];
     for (const tcData of generatedTestCases) {
       const testCase = new TestCase({
@@ -67,46 +108,26 @@ exports.generateTestCases = async (req, res) => {
         scenarioType: tcData.scenarioType || scenarioType,
         priority,
         environment,
-        platforms,
-        areaPath: tcData.areaPath,
-        assignedTo: tcData.assignedTo,
-        state: tcData.state
+        platforms
       });
       const saved = await testCase.save();
       savedTestCases.push(saved);
     }
 
-    // Calculate scenarios - for "All" mode, count unique titles
-    let actualScenarios;
-    if (isAllMode) {
-      actualScenarios = savedTestCases.filter(tc => tc.workItemType === 'Test Case').length;
-    } else {
-      const totalRowsPerScenario = 1 + parseInt(numberOfSteps);
-      actualScenarios = Math.floor(savedTestCases.length / totalRowsPerScenario);
-    }
+    // Calculate actual scenarios (header rows)
+    const headerRows = generatedTestCases.filter(tc => tc.workItemType === 'Test Case').length;
+    
+    console.log(`💾 Saved ${savedTestCases.length} rows (${headerRows} scenarios)`);
+    console.log('═══════════════════════════════════════════════════════════');
 
-    console.log(`💾 Saved ${savedTestCases.length} test case rows (${actualScenarios} scenarios)`);
-
-    // Group by scenario type for "All" mode
-    let scenarioBreakdown = {};
-    if (isAllMode) {
-      savedTestCases.forEach(tc => {
-        if (tc.workItemType === 'Test Case' && tc.scenarioType) {
-          scenarioBreakdown[tc.scenarioType] = (scenarioBreakdown[tc.scenarioType] || 0) + 1;
-        }
-      });
-    }
-
+    // Return the generated test cases
     res.status(201).json({
       success: true,
-      message: isAllMode 
-        ? `Generated comprehensive test coverage: ${actualScenarios} scenarios across all types`
-        : `Generated ${actualScenarios} test case scenarios with ${savedTestCases.length} total rows`,
-      testCases: savedTestCases,
-      count: savedTestCases.length,
-      scenarios: actualScenarios,
-      isComprehensive: isAllMode,
-      scenarioBreakdown: isAllMode ? scenarioBreakdown : undefined
+      message: `Generated ${headerRows} test case scenarios with ${generatedTestCases.length} total rows`,
+      testCases: generatedTestCases,
+      count: generatedTestCases.length,
+      scenarios: headerRows,
+      mode: isComprehensiveMode ? 'comprehensive' : 'standard'
     });
 
   } catch (error) {
@@ -118,6 +139,9 @@ exports.generateTestCases = async (req, res) => {
   }
 };
 
+// @desc    Get all test cases
+// @route   GET /api/testcases
+// @access  Public
 exports.getAllTestCases = async (req, res) => {
   try {
     const testCases = await TestCase.find().sort({ createdAt: -1 });
@@ -128,6 +152,9 @@ exports.getAllTestCases = async (req, res) => {
   }
 };
 
+// @desc    Get single test case by ID
+// @route   GET /api/testcases/:id
+// @access  Public
 exports.getTestCaseById = async (req, res) => {
   try {
     const testCase = await TestCase.findById(req.params.id);
@@ -141,6 +168,9 @@ exports.getTestCaseById = async (req, res) => {
   }
 };
 
+// @desc    Update test case
+// @route   PUT /api/testcases/:id
+// @access  Public
 exports.updateTestCase = async (req, res) => {
   try {
     const testCase = await TestCase.findByIdAndUpdate(
@@ -151,7 +181,7 @@ exports.updateTestCase = async (req, res) => {
     if (!testCase) {
       return res.status(404).json({ error: 'Test case not found' });
     }
-    console.log(`✅ Updated test case at index ${req.params.id}:`, req.body);
+    console.log(`✅ Updated test case: ${req.params.id}`);
     res.status(200).json(testCase);
   } catch (error) {
     console.error('Error updating test case:', error);
@@ -159,12 +189,16 @@ exports.updateTestCase = async (req, res) => {
   }
 };
 
+// @desc    Delete single test case
+// @route   DELETE /api/testcases/:id
+// @access  Public
 exports.deleteTestCase = async (req, res) => {
   try {
     const testCase = await TestCase.findByIdAndDelete(req.params.id);
     if (!testCase) {
       return res.status(404).json({ error: 'Test case not found' });
     }
+    console.log(`🗑️ Deleted test case: ${req.params.id}`);
     res.status(200).json({
       success: true,
       message: 'Test case deleted successfully'
@@ -175,6 +209,9 @@ exports.deleteTestCase = async (req, res) => {
   }
 };
 
+// @desc    Get statistics
+// @route   GET /api/testcases/statistics
+// @access  Public
 exports.getStatistics = async (req, res) => {
   try {
     const total = await TestCase.countDocuments();
@@ -187,13 +224,19 @@ exports.getStatistics = async (req, res) => {
 
     const byScenarioType = {};
     scenarioStats.forEach(stat => {
-      byScenarioType[stat._id] = stat.count;
+      if (stat._id) {
+        byScenarioType[stat._id] = stat.count;
+      }
     });
 
     const byPriority = {};
     priorityStats.forEach(stat => {
-      byPriority[stat._id] = stat.count;
+      if (stat._id) {
+        byPriority[stat._id] = stat.count;
+      }
     });
+
+    console.log('📊 Statistics:', { total, byScenarioType, byPriority });
 
     res.status(200).json({
       total,
@@ -202,13 +245,21 @@ exports.getStatistics = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching statistics:', error);
-    res.status(500).json({ error: 'Failed to fetch statistics' });
+    res.status(200).json({ 
+      total: 0,
+      byScenarioType: {},
+      byPriority: {}
+    });
   }
 };
 
+// @desc    Delete all test cases
+// @route   DELETE /api/testcases
+// @access  Public
 exports.deleteAllTestCases = async (req, res) => {
   try {
     const result = await TestCase.deleteMany({});
+    console.log(`🗑️ Deleted all test cases: ${result.deletedCount}`);
     res.status(200).json({
       success: true,
       message: `${result.deletedCount} test cases deleted successfully`,
@@ -217,5 +268,24 @@ exports.deleteAllTestCases = async (req, res) => {
   } catch (error) {
     console.error('Error deleting test cases:', error);
     res.status(500).json({ error: 'Failed to delete test cases' });
+  }
+};
+
+// @desc    Get rate limit status
+// @route   GET /api/testcases/rate-limit
+// @access  Public
+exports.getRateLimitStatus = async (req, res) => {
+  try {
+    const status = getGroqRateLimitStatus();
+    res.status(200).json({
+      success: true,
+      ...status
+    });
+  } catch (error) {
+    console.error('Error getting rate limit status:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to get rate limit status' 
+    });
   }
 };

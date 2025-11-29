@@ -7,13 +7,17 @@ const {
   updateTestCase,
   deleteTestCase,
   getStatistics,
-  deleteAllTestCases
+  deleteAllTestCases,
+  getRateLimitStatus
 } = require('../controllers/testCaseController');
 
 // Generate test cases with AI
 router.post('/generate', generateTestCases);
 
-// Get statistics
+// Get rate limit status
+router.get('/rate-limit', getRateLimitStatus);
+
+// Get statistics - MUST be before /:id route
 router.get('/statistics', getStatistics);
 
 // Get all test cases

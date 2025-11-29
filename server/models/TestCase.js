@@ -1,8 +1,10 @@
 // In-memory storage for test cases
 let testCases = [];
+let idCounter = 1;
 
 class TestCase {
   constructor(data) {
+    this._id = data._id || `tc-${Date.now()}-${idCounter++}`;
     this.id = data.id || '';
     this.testCaseId = this.id;
     this.workItemType = data.workItemType || '';
@@ -19,7 +21,6 @@ class TestCase {
     this.platforms = data.platforms || ['Web'];
     this.createdAt = new Date();
     this.updatedAt = new Date();
-    this.index = testCases.length; // Store position index
   }
 
   save() {
@@ -32,9 +33,9 @@ class TestCase {
       sort: (sortOptions) => {
         const sorted = [...testCases].sort((a, b) => {
           if (sortOptions.createdAt === -1) {
-            return b.createdAt - a.createdAt;
+            return new Date(b.createdAt) - new Date(a.createdAt);
           }
-          return a.createdAt - b.createdAt;
+          return new Date(a.createdAt) - new Date(b.createdAt);
         });
         return Promise.resolve(sorted);
       }
@@ -43,24 +44,27 @@ class TestCase {
 
   static findById(id) {
     // If id is a number, treat it as index
-    if (typeof id === 'number' || !isNaN(id)) {
+    if (!isNaN(id)) {
       const index = parseInt(id);
-      return Promise.resolve(testCases[index]);
+      if (index >= 0 && index < testCases.length) {
+        return Promise.resolve(testCases[index]);
+      }
     }
-    // Otherwise search by id field
-    const testCase = testCases.find(tc => tc.id === id || tc.testCaseId === id);
-    return Promise.resolve(testCase);
+    // Otherwise search by _id field
+    const testCase = testCases.find(tc => tc._id === id || tc.id === id);
+    return Promise.resolve(testCase || null);
   }
 
   static findByIdAndUpdate(id, updateData, options) {
-    let index;
-    if (typeof id === 'number' || !isNaN(id)) {
+    let index = -1;
+    
+    if (!isNaN(id)) {
       index = parseInt(id);
     } else {
-      index = testCases.findIndex(tc => tc.id === id || tc.testCaseId === id);
+      index = testCases.findIndex(tc => tc._id === id || tc.id === id);
     }
     
-    if (index !== -1) {
+    if (index >= 0 && index < testCases.length) {
       testCases[index] = { ...testCases[index], ...updateData, updatedAt: new Date() };
       return Promise.resolve(testCases[index]);
     }
@@ -68,21 +72,22 @@ class TestCase {
   }
 
   static findByIdAndDelete(id) {
-    let index;
-    if (typeof id === 'number' || !isNaN(id)) {
+    let index = -1;
+    
+    if (!isNaN(id)) {
       index = parseInt(id);
     } else {
-      index = testCases.findIndex(tc => tc.id === id || tc.testCaseId === id);
+      index = testCases.findIndex(tc => tc._id === id || tc.id === id);
     }
     
-    if (index !== -1) {
+    if (index >= 0 && index < testCases.length) {
       const deleted = testCases.splice(index, 1)[0];
       return Promise.resolve(deleted);
     }
     return Promise.resolve(null);
   }
 
-  static deleteMany() {
+  static deleteMany(filter = {}) {
     const count = testCases.length;
     testCases = [];
     return Promise.resolve({ deletedCount: count });
@@ -100,13 +105,21 @@ class TestCase {
         return;
       }
 
-      const field = groupStage.$group._id.replace('$', '');
+      const fieldPath = groupStage.$group._id;
+      if (!fieldPath) {
+        resolve([]);
+        return;
+      }
+
+      const field = fieldPath.replace('$', '');
       const grouped = {};
 
       testCases.forEach(tc => {
-        const value = tc[field] || 'Unknown';
-        if (!grouped[value]) grouped[value] = 0;
-        grouped[value]++;
+        const value = tc[field];
+        if (value) {
+          if (!grouped[value]) grouped[value] = 0;
+          grouped[value]++;
+        }
       });
 
       const result = Object.entries(grouped).map(([key, count]) => ({
@@ -116,6 +129,18 @@ class TestCase {
 
       resolve(result);
     });
+  }
+
+  // Get all test cases (for export)
+  static getAll() {
+    return testCases;
+  }
+
+  // Clear all test cases
+  static clearAll() {
+    const count = testCases.length;
+    testCases = [];
+    return count;
   }
 }
 

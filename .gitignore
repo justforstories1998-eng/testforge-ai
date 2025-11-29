@@ -1,44 +1,23 @@
-# .gitignore (ROOT LEVEL)
-
-# Node modules
+# Dependencies
 node_modules/
-client/node_modules/
-server/node_modules/
 
 # Environment variables
 .env
-server/.env
-client/.env
-
-# Build files
-client/build/
-client/dist/
+.env.local
+.env.*.local
 
 # Logs
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
 # OS files
 .DS_Store
 Thumbs.db
 
-# IDE files
+# IDE
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
-
-# Testing
-coverage/
-
-# Database
-*.db
-*.sqlite
 
 # Temporary files
 tmp/
 temp/
-.vercel

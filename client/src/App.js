@@ -8,7 +8,7 @@ import Statistics from './components/Statistics';
 import SplashScreen from './components/SplashScreen';
 import Logo from './components/Logo';
 
-const API_URL = process.env.REACT_APP_API_URL || '/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('generate');
@@ -17,9 +17,14 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showSplash, setShowSplash] = useState(true);
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState({
+    total: 0,
+    byScenarioType: {},
+    byPriority: {}
+  });
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Hide splash screen after 3 seconds
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowSplash(false);
@@ -28,6 +33,7 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Fetch data after splash screen
   useEffect(() => {
     if (!showSplash) {
       fetchAllTestCases();
@@ -35,24 +41,39 @@ function App() {
     }
   }, [showSplash]);
 
+  // Fetch all test cases from API
   const fetchAllTestCases = async () => {
     try {
       const response = await axios.get(`${API_URL}/testcases`);
-      setAllTestCases(response.data);
+      setAllTestCases(response.data || []);
     } catch (err) {
       console.error('Error fetching test cases:', err);
+      setAllTestCases([]);
     }
   };
 
+  // Fetch statistics from API
   const fetchStatistics = async () => {
     try {
       const response = await axios.get(`${API_URL}/testcases/statistics`);
-      setStats(response.data);
+      console.log('📊 Statistics response:', response.data);
+      
+      setStats({
+        total: response.data.total || 0,
+        byScenarioType: response.data.byScenarioType || {},
+        byPriority: response.data.byPriority || {}
+      });
     } catch (err) {
       console.error('Error fetching statistics:', err);
+      setStats({
+        total: 0,
+        byScenarioType: {},
+        byPriority: {}
+      });
     }
   };
 
+  // Handle test case generation
   const handleGenerateTestCases = async (formData) => {
     setLoading(true);
     setError('');
@@ -62,19 +83,34 @@ function App() {
     try {
       console.log('Generating test cases with:', formData);
       
+      // Check if comprehensive mode
+      const isComprehensive = formData.scenarioType === 'All';
+      
       const response = await axios.post(`${API_URL}/testcases/generate`, formData);
       
-      if (response.data && response.data.testCases) {
+      console.log('📦 Response:', response.data);
+      
+      if (response.data && response.data.testCases && response.data.testCases.length > 0) {
         setTestCases(response.data.testCases);
         await fetchAllTestCases();
         await fetchStatistics();
         
-        const scenarioCount = Math.floor(response.data.testCases.length / (parseInt(formData.numberOfSteps) + 1));
-        setSuccessMessage(`✅ Successfully generated ${scenarioCount} test scenarios with ${response.data.testCases.length} total rows!`);
+        // Calculate scenarios correctly
+        const scenarioCount = response.data.scenarios || 
+          response.data.testCases.filter(tc => tc.workItemType === 'Test Case').length;
+        const totalRows = response.data.count || response.data.testCases.length;
+        
+        // Build success message
+        let modeText = '';
+        if (isComprehensive) {
+          modeText = ' covering Positive, Negative, Boundary & Edge cases';
+        }
+        
+        setSuccessMessage(`✅ Successfully generated ${scenarioCount} test scenarios with ${totalRows} total rows!${modeText}`);
         
         return { success: true, message: response.data.message };
       } else {
-        throw new Error('Invalid response format');
+        throw new Error('No test cases were generated. Please try again.');
       }
     } catch (err) {
       console.error('Error generating test cases:', err);
@@ -86,6 +122,7 @@ function App() {
     }
   };
 
+  // Handle single test case deletion
   const handleDeleteTestCase = async (index) => {
     if (!window.confirm('Are you sure you want to delete this test case row?')) {
       return;
@@ -94,8 +131,10 @@ function App() {
     try {
       await axios.delete(`${API_URL}/testcases/${index}`);
       
+      // Update local state
       setTestCases(prev => prev.filter((_, i) => i !== index));
       
+      // Refresh data
       await fetchAllTestCases();
       await fetchStatistics();
       
@@ -107,6 +146,7 @@ function App() {
     }
   };
 
+  // Handle clear all test cases
   const handleClearAll = async () => {
     if (!window.confirm('Are you sure you want to delete ALL test cases? This cannot be undone.')) {
       return;
@@ -125,6 +165,7 @@ function App() {
     }
   };
 
+  // Handle export functionality
   const handleExportTestCases = (format, casesToExport) => {
     try {
       const exportData = casesToExport && casesToExport.length > 0 ? casesToExport : testCases;
@@ -134,12 +175,19 @@ function App() {
         return;
       }
 
-      if (format === 'csv') {
-        exportAsCSV(exportData);
-      } else if (format === 'json') {
-        exportAsJSON(exportData);
-      } else if (format === 'markdown') {
-        exportAsMarkdown(exportData);
+      switch (format) {
+        case 'csv':
+          exportAsCSV(exportData);
+          break;
+        case 'json':
+          exportAsJSON(exportData);
+          break;
+        case 'markdown':
+          exportAsMarkdown(exportData);
+          break;
+        default:
+          console.error('Unknown export format:', format);
+          return;
       }
       
       setSuccessMessage(`✅ Exported ${exportData.length} rows as ${format.toUpperCase()}!`);
@@ -150,8 +198,20 @@ function App() {
     }
   };
 
+  // Export as CSV
   const exportAsCSV = (data) => {
-    const headers = ['ID', 'Work Item Type', 'Title', 'Test Step', 'Step Action', 'Step Expected', 'Area Path', 'Assigned To', 'State'];
+    const headers = [
+      'ID',
+      'Work Item Type',
+      'Title',
+      'Test Step',
+      'Step Action',
+      'Step Expected',
+      'Area Path',
+      'Assigned To',
+      'State',
+      'Scenario Type'
+    ];
     
     const rows = data.map(tc => [
       tc.id || '',
@@ -162,7 +222,8 @@ function App() {
       tc.stepExpected || '',
       tc.areaPath || '',
       tc.assignedTo || '',
-      tc.state || ''
+      tc.state || '',
+      tc.scenarioType || ''
     ]);
 
     const csvContent = [
@@ -173,24 +234,57 @@ function App() {
     downloadFile(csvContent, 'text/csv', 'test-cases.csv');
   };
 
+  // Export as JSON
   const exportAsJSON = (data) => {
-    const dataStr = JSON.stringify(data, null, 2);
+    const exportObj = {
+      exportDate: new Date().toISOString(),
+      totalRows: data.length,
+      testCases: data
+    };
+    const dataStr = JSON.stringify(exportObj, null, 2);
     downloadFile(dataStr, 'application/json', 'test-cases.json');
   };
 
+  // Export as Markdown
   const exportAsMarkdown = (data) => {
-    const headers = ['ID', 'Work Item Type', 'Title', 'Test Step', 'Step Action', 'Step Expected', 'Area Path', 'Assigned To', 'State'];
+    const headers = [
+      'ID',
+      'Work Item Type',
+      'Title',
+      'Test Step',
+      'Step Action',
+      'Step Expected',
+      'Area Path',
+      'Assigned To',
+      'State'
+    ];
     
-    let markdown = '| ' + headers.join(' | ') + ' |\n';
+    let markdown = '# Test Cases Export\n\n';
+    markdown += `**Export Date:** ${new Date().toLocaleString()}\n\n`;
+    markdown += `**Total Rows:** ${data.length}\n\n`;
+    markdown += '---\n\n';
+    markdown += '| ' + headers.join(' | ') + ' |\n';
     markdown += '| ' + headers.map(() => '---').join(' | ') + ' |\n';
     
     data.forEach(tc => {
-      markdown += `| ${tc.id || ''} | ${tc.workItemType || ''} | ${tc.title || ''} | ${tc.testStep || ''} | ${tc.stepAction || ''} | ${tc.stepExpected || ''} | ${tc.areaPath || ''} | ${tc.assignedTo || ''} | ${tc.state || ''} |\n`;
+      const row = [
+        tc.id || '',
+        tc.workItemType || '',
+        (tc.title || '').replace(/\|/g, '\\|'),
+        tc.testStep || '',
+        (tc.stepAction || '').replace(/\|/g, '\\|'),
+        (tc.stepExpected || '').replace(/\|/g, '\\|'),
+        tc.areaPath || '',
+        tc.assignedTo || '',
+        tc.state || ''
+      ];
+      markdown += '| ' + row.join(' | ') + ' |\n';
     });
 
     downloadFile(markdown, 'text/markdown', 'test-cases.md');
   };
 
+  // Download file helper
   const downloadFile = (content, mimeType, filename) => {
     const blob = new Blob([content], { type: mimeType });
     const url = window.URL.createObjectURL(blob);
@@ -203,12 +297,14 @@ function App() {
     window.URL.revokeObjectURL(url);
   };
 
+  // Show splash screen
   if (showSplash) {
     return <SplashScreen />;
   }
 
   return (
     <div className="App">
+      {/* Header */}
       <header className="app-header">
         <div className="header-content">
           <div className="logo-section">
@@ -231,8 +327,10 @@ function App() {
         </div>
       </header>
 
+      {/* Main Content */}
       <main className="app-main">
         <div className="container">
+          {/* Error Banner */}
           {error && (
             <div className="message-banner error-banner">
               <span>⚠️ {error}</span>
@@ -240,6 +338,7 @@ function App() {
             </div>
           )}
 
+          {/* Success Banner */}
           {successMessage && (
             <div className="message-banner success-banner">
               <span>{successMessage}</span>
@@ -247,17 +346,22 @@ function App() {
             </div>
           )}
 
+          {/* Generate Page */}
           {currentPage === 'generate' ? (
             <>
+              {/* Test Case Form */}
               <TestCaseForm 
                 onGenerate={handleGenerateTestCases} 
                 loading={loading}
               />
 
+              {/* Statistics */}
               {stats && <Statistics stats={stats} />}
 
+              {/* Generated Test Cases */}
               {testCases.length > 0 && (
                 <>
+                  {/* Export Section */}
                   <div className="export-section">
                     <div className="export-header">
                       <h3>📥 Export Current Results</h3>
@@ -288,6 +392,7 @@ function App() {
                     </div>
                   </div>
 
+                  {/* Test Case List */}
                   <TestCaseList 
                     testCases={testCases}
                     onDelete={handleDeleteTestCase}
@@ -297,6 +402,7 @@ function App() {
               )}
             </>
           ) : (
+            /* History Page */
             <TestCaseHistory 
               testCases={allTestCases}
               onDelete={handleDeleteTestCase}
@@ -307,6 +413,7 @@ function App() {
         </div>
       </main>
 
+      {/* Footer */}
       <footer className="app-footer">
         <div className="footer-content">
           <p>© 2024 TestForge AI</p>

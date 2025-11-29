@@ -56,7 +56,7 @@ function TestCaseList({ testCases, onDelete, title }) {
                   <td className="assigned-cell">{tc.assignedTo || ''}</td>
                   <td className="state-cell">
                     {tc.state && (
-                      <span className={`state-badge state-${tc.state?.toLowerCase()}`}>
+                      <span className={`state-badge state-${(tc.state || '').toLowerCase()}`}>
                         {tc.state}
                       </span>
                     )}

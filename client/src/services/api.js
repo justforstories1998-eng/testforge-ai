@@ -9,7 +9,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 seconds timeout
+  timeout: 60000, // 60 seconds timeout for AI generation
 });
 
 // Request interceptor
@@ -105,7 +105,7 @@ export const deleteTestCase = async (id) => {
  */
 export const deleteAllTestCases = async () => {
   try {
-    const response = await api.delete('/testcases/all/delete');
+    const response = await api.delete('/testcases');
     return response.data;
   } catch (error) {
     throw error.response?.data || { error: 'Failed to delete all test cases' };
@@ -138,7 +138,6 @@ export const exportAsCSV = async (testCaseIds) => {
       { responseType: 'blob' }
     );
     
-    // Create download link
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;
@@ -163,7 +162,6 @@ export const exportAsJSON = async (testCaseIds) => {
       { responseType: 'blob' }
     );
     
-    // Create download link
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;
@@ -188,7 +186,6 @@ export const exportAsExcel = async (testCaseIds) => {
       { responseType: 'blob' }
     );
     
-    // Create download link
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;

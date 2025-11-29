@@ -2,11 +2,19 @@ import React from 'react';
 import './Statistics.css';
 
 function Statistics({ stats }) {
+  // Return null if no stats provided
   if (!stats) {
     return null;
   }
 
-  const { total, byScenarioType, byPriority } = stats;
+  // Safely extract values with defaults
+  const total = stats.total || 0;
+  const byScenarioType = stats.byScenarioType || {};
+  const byPriority = stats.byPriority || {};
+
+  // Safely get keys
+  const scenarioTypeKeys = Object.keys(byScenarioType);
+  const priorityKeys = Object.keys(byPriority);
 
   return (
     <div className="statistics">
@@ -25,7 +33,7 @@ function Statistics({ stats }) {
         <div className="stat-card">
           <span className="stat-icon">🎯</span>
           <div className="stat-value">
-            {Object.keys(byScenarioType).length}
+            {scenarioTypeKeys.length}
           </div>
           <div className="stat-label">Scenario Types</div>
         </div>
@@ -33,7 +41,7 @@ function Statistics({ stats }) {
         <div className="stat-card">
           <span className="stat-icon">⚡</span>
           <div className="stat-value">
-            {Object.keys(byPriority).length}
+            {priorityKeys.length}
           </div>
           <div className="stat-label">Priority Levels</div>
         </div>
@@ -43,15 +51,16 @@ function Statistics({ stats }) {
         <div className="breakdown-section">
           <h4>Scenario Types</h4>
           <div className="breakdown-list">
-            {Object.entries(byScenarioType).length > 0 ? (
+            {scenarioTypeKeys.length > 0 ? (
               Object.entries(byScenarioType).map(([type, count]) => (
                 <div key={type} className="breakdown-item">
                   <span className="breakdown-item-label">
-                    {type === 'Positive' && '✓'}
-                    {type === 'Negative' && '✗'}
-                    {type === 'Boundary' && '⚡'}
-                    {type === 'Edge' && '🔍'}
-                    {' '}{type}
+                    {type.includes('Positive') && '✓ '}
+                    {type.includes('Negative') && '✗ '}
+                    {type.includes('Boundary') && '⚡ '}
+                    {type.includes('Edge') && '🔍 '}
+                    {type.includes('API') && '🔌 '}
+                    {type}
                   </span>
                   <span className="breakdown-item-value">{count}</span>
                 </div>
@@ -65,14 +74,15 @@ function Statistics({ stats }) {
         <div className="breakdown-section">
           <h4>Priority Levels</h4>
           <div className="breakdown-list">
-            {Object.entries(byPriority).length > 0 ? (
+            {priorityKeys.length > 0 ? (
               Object.entries(byPriority).map(([priority, count]) => (
                 <div key={priority} className="breakdown-item">
                   <span className="breakdown-item-label">
-                    {priority === 'High' && '🔴'}
-                    {priority === 'Medium' && '🟡'}
-                    {priority === 'Low' && '🟢'}
-                    {' '}{priority}
+                    {priority === 'Critical' && '🔴 '}
+                    {priority === 'High' && '🟠 '}
+                    {priority === 'Medium' && '🟡 '}
+                    {priority === 'Low' && '🟢 '}
+                    {priority}
                   </span>
                   <span className="breakdown-item-value">{count}</span>
                 </div>

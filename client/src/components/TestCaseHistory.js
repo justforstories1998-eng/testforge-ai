@@ -6,17 +6,20 @@ function TestCaseHistory({ testCases, onDelete, onClearAll, onExport }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
 
-  const filteredTestCases = testCases.filter(tc => {
+  // Ensure testCases is an array
+  const safeTestCases = testCases || [];
+
+  const filteredTestCases = safeTestCases.filter(tc => {
     const matchesSearch = 
-      tc.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tc.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tc.stepAction?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tc.assignedTo?.toLowerCase().includes(searchTerm.toLowerCase());
+      (tc.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (tc.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (tc.stepAction || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (tc.assignedTo || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesFilter = 
       filterType === 'all' ? true :
       filterType === 'header' ? tc.workItemType === 'Test Case' :
-      filterType === 'detail' ? tc.workItemType === '' :
+      filterType === 'detail' ? tc.workItemType === '' || !tc.workItemType :
       true;
 
     return matchesSearch && matchesFilter;
@@ -56,45 +59,45 @@ function TestCaseHistory({ testCases, onDelete, onClearAll, onExport }) {
               className={`filter-btn ${filterType === 'all' ? 'active' : ''}`}
               onClick={() => setFilterType('all')}
             >
-              All ({testCases.length})
+              All ({safeTestCases.length})
             </button>
             <button 
               className={`filter-btn ${filterType === 'header' ? 'active' : ''}`}
               onClick={() => setFilterType('header')}
             >
-              Headers ({testCases.filter(tc => tc.workItemType).length})
+              Headers ({safeTestCases.filter(tc => tc.workItemType).length})
             </button>
             <button 
               className={`filter-btn ${filterType === 'detail' ? 'active' : ''}`}
               onClick={() => setFilterType('detail')}
             >
-              Details ({testCases.filter(tc => !tc.workItemType).length})
+              Details ({safeTestCases.filter(tc => !tc.workItemType).length})
             </button>
           </div>
         </div>
       </div>
 
-      {testCases.length > 0 && (
+      {safeTestCases.length > 0 && (
         <div className="export-section-history">
           <h3>📥 Export All History</h3>
           <div className="export-buttons">
             <button 
               className="export-btn csv-btn"
-              onClick={() => onExport('csv', testCases)}
+              onClick={() => onExport('csv', safeTestCases)}
             >
               <span className="btn-icon">📄</span>
               <span className="btn-text">Export CSV</span>
             </button>
             <button 
               className="export-btn json-btn"
-              onClick={() => onExport('json', testCases)}
+              onClick={() => onExport('json', safeTestCases)}
             >
               <span className="btn-icon">📋</span>
               <span className="btn-text">Export JSON</span>
             </button>
             <button 
               className="export-btn markdown-btn"
-              onClick={() => onExport('markdown', testCases)}
+              onClick={() => onExport('markdown', safeTestCases)}
             >
               <span className="btn-icon">📝</span>
               <span className="btn-text">Export Markdown</span>
