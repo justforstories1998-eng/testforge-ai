@@ -2,15 +2,57 @@
   "version": 2,
   "buildCommand": "cd client && npm install && npm run build",
   "outputDirectory": "client/build",
-  "installCommand": "npm install",
-  "routes": [
+  "installCommand": "npm install && cd client && npm install && cd ../api && npm install",
+  "framework": null,
+  "functions": {
+    "api/*.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/testcases.js"
+      "source": "/api/testcases/generate",
+      "destination": "/api/testcases"
     },
     {
-      "src": "/(.*)",
-      "dest": "/client/build/$1"
+      "source": "/api/testcases/statistics",
+      "destination": "/api/testcases"
+    },
+    {
+      "source": "/api/testcases/rate-limit",
+      "destination": "/api/testcases"
+    },
+    {
+      "source": "/api/testcases/:id",
+      "destination": "/api/testcases"
+    },
+    {
+      "source": "/api/testcases",
+      "destination": "/api/testcases"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/health"
+    },
+    {
+      "source": "/api/export/:type",
+      "destination": "/api/export"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Credentials", "value": "true" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT" },
+        { "key": "Access-Control-Allow-Headers", "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization" }
+      ]
     }
   ]
 }

@@ -1,8 +1,9 @@
 {
   "name": "api",
   "version": "1.0.0",
-  "type": "module",
+  "description": "Serverless API functions",
+  "private": true,
   "dependencies": {
-    "groq-sdk": "^0.3.2"
+    "groq-sdk": "^0.3.0"
   }
 }

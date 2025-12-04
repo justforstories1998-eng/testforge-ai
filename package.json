@@ -1,18 +1,21 @@
 {
-  "name": "ai-test-case-generator",
+  "name": "generate-test-case",
   "version": "1.0.0",
-  "description": "AI-powered test case generator for Azure DevOps",
-  "scripts": {
-    "start": "node server/server.js",
-    "build": "cd client && npm install && npm run build",
-    "install-server": "cd server && npm install",
-    "install-client": "cd client && npm install",
-    "dev": "node server/server.js"
-  },
-  "keywords": ["test-case", "generator", "ai", "azure-devops"],
-  "author": "Your Name",
-  "license": "MIT",
+  "description": "AI-Powered Test Case Generator for Azure DevOps",
+  "private": true,
   "engines": {
-    "node": "24.x"
+    "node": "20.x"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm start",
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start",
+    "install-all": "npm install && cd client && npm install && cd ../server && npm install && cd ../api && npm install",
+    "vercel-build": "cd client && npm install && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   }
 }

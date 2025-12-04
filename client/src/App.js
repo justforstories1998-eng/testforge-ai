@@ -8,7 +8,15 @@ import Statistics from './components/Statistics';
 import SplashScreen from './components/SplashScreen';
 import Logo from './components/Logo';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// Determine API URL based on environment
+const getApiUrl = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return '/api';
+  }
+  return process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+};
+
+const API_URL = getApiUrl();
 
 function App() {
   const [currentPage, setCurrentPage] = useState('generate');
