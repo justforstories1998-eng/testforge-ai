@@ -31,6 +31,11 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(cors({
+  origin: ['https://testforge-ai.netlify.app', 'http://localhost:3000'],
+  credentials: true
+}));
+
 // Routes
 app.use('/api/testcases', testCaseRoutes);
 app.use('/api/export', exportRoutes);
