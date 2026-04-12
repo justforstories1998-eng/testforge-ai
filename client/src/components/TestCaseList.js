@@ -1,80 +1,78 @@
 import React from 'react';
+import { FaTrashAlt, FaListAlt } from 'react-icons/fa';
 import './TestCaseList.css';
 
 function TestCaseList({ testCases, onDelete, title }) {
-  if (!testCases || testCases.length === 0) {
-    return (
-      <div className="no-test-cases">
-        <div className="empty-state">
-          <span className="empty-icon">📝</span>
-          <h3>No Test Cases Yet</h3>
-          <p>Generate test cases to see them appear here!</p>
-        </div>
-      </div>
-    );
-  }
+  if (!testCases || testCases.length === 0) return null;
 
   return (
-    <div className="test-case-list">
-      <div className="list-header">
-        <h2>{title || '📋 Test Cases'}</h2>
-        <div className="header-actions">
-          <span className="count-badge">{testCases.length} Rows</span>
+    <div className="list-container">
+      <div className="list-header-area">
+        <div className="list-title-group">
+          <FaListAlt className="list-icon" />
+          <h2>{title || 'Session Results'}</h2>
         </div>
+        <span className="list-count-badge">{testCases.length} Rows</span>
       </div>
 
-      <div className="table-container">
-        <div className="table-scroll">
-          <table className="test-case-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Work Item Type</th>
-                <th>Title</th>
-                <th>Test Step</th>
-                <th>Step Action</th>
-                <th>Step Expected</th>
-                <th>Area Path</th>
-                <th>Assigned To</th>
-                <th>State</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {testCases.map((tc, index) => (
-                <tr 
-                  key={`${index}-${tc.testStep || 'header'}`} 
-                  className={tc.workItemType ? 'header-row' : 'detail-row'}
-                >
-                  <td className="id-cell">{tc.id || ''}</td>
-                  <td className="type-cell">{tc.workItemType || ''}</td>
-                  <td className="title-cell">{tc.title || ''}</td>
-                  <td className="step-cell">{tc.testStep || ''}</td>
-                  <td className="action-cell">{tc.stepAction || ''}</td>
-                  <td className="expected-cell">{tc.stepExpected || ''}</td>
-                  <td className="area-cell">{tc.areaPath || ''}</td>
-                  <td className="assigned-cell">{tc.assignedTo || ''}</td>
-                  <td className="state-cell">
+      <div className="table-responsive-wrapper">
+        <table className="tc-data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Work Item Type</th>
+              <th>Title</th>
+              <th>Step</th>
+              <th>Step Action</th>
+              <th>Step Expected</th>
+              <th>Area Path</th>
+              <th>Assigned</th>
+              <th>State</th>
+              <th className="text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {testCases.map((tc, index) => {
+              const isHeader = tc.workItemType === 'Test Case';
+              return (
+                <tr key={index} className={isHeader ? 'row-header' : 'row-step'}>
+                  <td className="col-id">{tc.id || ''}</td>
+                  <td className="col-type">
+                    {isHeader && <span className="type-tag">Test Case</span>}
+                  </td>
+                  <td className="col-title">
+                    <div className="text-truncate-multiline">{tc.title || ''}</div>
+                  </td>
+                  <td className="col-step text-center">{tc.testStep || ''}</td>
+                  <td className="col-action">
+                    <div className="text-content">{tc.stepAction || ''}</div>
+                  </td>
+                  <td className="col-expected">
+                    <div className="text-content">{tc.stepExpected || ''}</div>
+                  </td>
+                  <td className="col-area">{tc.areaPath || ''}</td>
+                  <td className="col-assigned">{tc.assignedTo || ''}</td>
+                  <td className="col-state">
                     {tc.state && (
-                      <span className={`state-badge state-${(tc.state || '').toLowerCase()}`}>
+                      <span className={`state-pill ${tc.state.toLowerCase()}`}>
                         {tc.state}
                       </span>
                     )}
                   </td>
-                  <td className="actions-cell">
+                  <td className="col-delete text-center">
                     <button 
                       onClick={() => onDelete(index)} 
-                      className="delete-btn"
-                      title="Delete Row"
+                      className="row-delete-btn"
+                      title="Remove Row"
                     >
-                      🗑️
+                      <FaTrashAlt />
                     </button>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   );

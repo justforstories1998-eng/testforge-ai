@@ -1,45 +1,35 @@
 import React from 'react';
+import { FaTerminal, FaPlus, FaHistory, FaChartBar } from 'react-icons/fa';
 import './Header.css';
-import { FaVial, FaGithub, FaChartBar } from 'react-icons/fa';
 
-const Header = ({ onShowStatistics }) => {
+const Header = ({ currentPage, onPageChange, historyCount }) => {
   return (
-    <header className="header">
-      <div className="header-container">
-        {/* Logo & Title */}
-        <div className="header-brand">
-          <div className="brand-icon">
-            <FaVial />
-          </div>
-          <div className="brand-text">
-            <h1 className="brand-title">
-              Generate<span className="brand-highlight">Test</span>Case
-            </h1>
-            <p className="brand-subtitle">Automated Test Case Generation</p>
-          </div>
+    <header className="app-header">
+      <div className="container header-inner">
+        <div className="brand">
+          <FaTerminal className="brand-icon" />
+          <span>TestForge<span className="accent">AI</span></span>
         </div>
-
-        {/* Navigation */}
-        <nav className="header-nav">
+        <nav className="nav-menu">
           <button 
-            className="nav-btn"
-            onClick={onShowStatistics}
-            title="View Statistics"
+            className={`nav-item ${currentPage === 'generate' ? 'active' : ''}`}
+            onClick={() => onPageChange('generate')}
           >
-            <FaChartBar />
-            <span>Statistics</span>
+            <FaPlus /> Generate
           </button>
-          
-          <a 
-            href="https://github.com/YOUR-USERNAME/Generate-test-case" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="nav-btn"
-            title="View on GitHub"
+          <button 
+            className={`nav-item ${currentPage === 'history' ? 'active' : ''}`}
+            onClick={() => onPageChange('history')}
           >
-            <FaGithub />
-            <span>GitHub</span>
-          </a>
+            <FaHistory /> History
+            {historyCount > 0 && <span className="badge">{historyCount}</span>}
+          </button>
+          <button 
+            className={`nav-item ${currentPage === 'statistics' ? 'active' : ''}`}
+            onClick={() => onPageChange('statistics')}
+          >
+            <FaChartBar /> Insights
+          </button>
         </nav>
       </div>
     </header>

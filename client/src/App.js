@@ -1,431 +1,320 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { 
+  FaExclamationTriangle, 
+  FaCheckCircle, 
+  FaDownload, 
+  FaFileCsv, 
+  FaFileCode, 
+  FaMarkdown, 
+  FaTimes,
+  FaMicrochip, // Changed from FaCpu to FaMicrochip
+  FaTerminal,
+  FaGithub
+} from 'react-icons/fa';
 import './App.css';
+
+// Components
+import Header from './components/Header';
 import TestCaseForm from './components/TestCaseForm';
 import TestCaseList from './components/TestCaseList';
 import TestCaseHistory from './components/TestCaseHistory';
 import Statistics from './components/Statistics';
 import SplashScreen from './components/SplashScreen';
-import Logo from './components/Logo';
+import LoadingOverlay from './components/LoadingOverlay';
 
-// Determine API URL based on environment
-const getApiUrl = () => {
-  if (process.env.NODE_ENV === 'production') {
-    return '/api';
-  }
-  return process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-};
-
-const API_URL = getApiUrl();
+const API_URL = process.env.NODE_ENV === 'production'
+  ? '/api'
+  : (process.env.REACT_APP_API_URL || 'http://localhost:5000/api');
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('generate');
+  const [page, setPage] = useState('generate');
   const [testCases, setTestCases] = useState([]);
   const [allTestCases, setAllTestCases] = useState([]);
+  const [stats, setStats] = useState({ total: 0, byScenarioType: {}, byPriority: {} });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [showSplash, setShowSplash] = useState(true);
-  const [stats, setStats] = useState({
-    total: 0,
-    byScenarioType: {},
-    byPriority: {}
-  });
-  const [successMessage, setSuccessMessage] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  // Hide splash screen after 3 seconds
+  // Splash screen timer
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowSplash(false);
-    }, 3000);
-
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setShowSplash(false), 2800);
+    return () => clearTimeout(t);
   }, []);
 
-  // Fetch data after splash screen
+  // Fetch all data from backend
+  const fetchAll = useCallback(async () => {
+    try {
+      const [casesRes, statsRes] = await Promise.all([
+        axios.get(`${API_URL}/testcases`),
+        axios.get(`${API_URL}/testcases/statistics`),
+      ]);
+      setAllTestCases(casesRes.data || []);
+      setStats({
+        total: statsRes.data.total || 0,
+        byScenarioType: statsRes.data.byScenarioType || {},
+        byPriority: statsRes.data.byPriority || {},
+      });
+    } catch (err) {
+      console.error('Fetch error:', err);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!showSplash) {
-      fetchAllTestCases();
-      fetchStatistics();
-    }
-  }, [showSplash]);
+    if (!showSplash) fetchAll();
+  }, [showSplash, fetchAll]);
 
-  // Fetch all test cases from API
-  const fetchAllTestCases = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/testcases`);
-      setAllTestCases(response.data || []);
-    } catch (err) {
-      console.error('Error fetching test cases:', err);
-      setAllTestCases([]);
+  // Auto-clear success messages
+  useEffect(() => {
+    if (success) {
+      const t = setTimeout(() => setSuccess(''), 4000);
+      return () => clearTimeout(t);
     }
-  };
-
-  // Fetch statistics from API
-  const fetchStatistics = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/testcases/statistics`);
-      console.log('📊 Statistics response:', response.data);
-      
-      setStats({
-        total: response.data.total || 0,
-        byScenarioType: response.data.byScenarioType || {},
-        byPriority: response.data.byPriority || {}
-      });
-    } catch (err) {
-      console.error('Error fetching statistics:', err);
-      setStats({
-        total: 0,
-        byScenarioType: {},
-        byPriority: {}
-      });
-    }
-  };
+  }, [success]);
 
   // Handle test case generation
-  const handleGenerateTestCases = async (formData) => {
+  const handleGenerate = async (formData) => {
     setLoading(true);
     setError('');
-    setSuccessMessage('');
+    setSuccess('');
     setTestCases([]);
-    
+
     try {
-      console.log('Generating test cases with:', formData);
-      
-      // Check if comprehensive mode
-      const isComprehensive = formData.scenarioType === 'All';
-      
-      const response = await axios.post(`${API_URL}/testcases/generate`, formData);
-      
-      console.log('📦 Response:', response.data);
-      
-      if (response.data && response.data.testCases && response.data.testCases.length > 0) {
-        setTestCases(response.data.testCases);
-        await fetchAllTestCases();
-        await fetchStatistics();
-        
-        // Calculate scenarios correctly
-        const scenarioCount = response.data.scenarios || 
-          response.data.testCases.filter(tc => tc.workItemType === 'Test Case').length;
-        const totalRows = response.data.count || response.data.testCases.length;
-        
-        // Build success message
-        let modeText = '';
-        if (isComprehensive) {
-          modeText = ' covering Positive, Negative, Boundary & Edge cases';
-        }
-        
-        setSuccessMessage(`✅ Successfully generated ${scenarioCount} test scenarios with ${totalRows} total rows!${modeText}`);
-        
-        return { success: true, message: response.data.message };
+      const res = await axios.post(`${API_URL}/testcases/generate`, formData);
+      if (res.data?.testCases?.length > 0) {
+        setTestCases(res.data.testCases);
+        await fetchAll();
+        const scenarios = res.data.scenarios || 0;
+        const total = res.data.count || 0;
+        const modeTag = res.data.mode === 'comprehensive'
+          ? ' (Comprehensive Mode)'
+          : '';
+        setSuccess(`Successfully generated ${scenarios} test scenarios totalling ${total} rows${modeTag}`);
+        return { success: true };
       } else {
-        throw new Error('No test cases were generated. Please try again.');
+        throw new Error('No test cases were generated. Please refine your criteria.');
       }
     } catch (err) {
-      console.error('Error generating test cases:', err);
-      const errorMessage = err.response?.data?.error || err.message || 'Failed to generate test cases';
-      setError(errorMessage);
-      return { success: false, message: errorMessage };
+      const msg = err.response?.data?.error || err.message || 'Generation process failed';
+      setError(msg);
+      return { success: false, message: msg };
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle single test case deletion
-  const handleDeleteTestCase = async (index) => {
-    if (!window.confirm('Are you sure you want to delete this test case row?')) {
-      return;
-    }
-
+  // Delete a specific row
+  const handleDelete = async (index) => {
+    if (!window.confirm('Are you sure you want to delete this specific row?')) return;
     try {
       await axios.delete(`${API_URL}/testcases/${index}`);
-      
-      // Update local state
       setTestCases(prev => prev.filter((_, i) => i !== index));
-      
-      // Refresh data
-      await fetchAllTestCases();
-      await fetchStatistics();
-      
-      setSuccessMessage('✅ Test case row deleted successfully!');
-      setTimeout(() => setSuccessMessage(''), 3000);
+      await fetchAll();
+      setSuccess('Record successfully removed');
     } catch (err) {
-      console.error('Error deleting test case:', err);
-      setError('Failed to delete test case');
+      setError('Unable to delete the requested record');
     }
   };
 
-  // Handle clear all test cases
+  // Clear entire history
   const handleClearAll = async () => {
-    if (!window.confirm('Are you sure you want to delete ALL test cases? This cannot be undone.')) {
-      return;
-    }
-
+    if (!window.confirm('This will permanently delete ALL test cases. Continue?')) return;
     try {
       await axios.delete(`${API_URL}/testcases`);
       setTestCases([]);
       setAllTestCases([]);
-      await fetchStatistics();
-      setSuccessMessage('✅ All test cases cleared successfully!');
-      setTimeout(() => setSuccessMessage(''), 3000);
+      await fetchAll();
+      setSuccess('All test history has been cleared');
     } catch (err) {
-      console.error('Error clearing test cases:', err);
-      setError('Failed to clear test cases');
+      setError('Failed to clear history');
     }
   };
 
-  // Handle export functionality
-  const handleExportTestCases = (format, casesToExport) => {
-    try {
-      const exportData = casesToExport && casesToExport.length > 0 ? casesToExport : testCases;
-      
-      if (!exportData || exportData.length === 0) {
-        alert('No test cases to export');
-        return;
-      }
-
-      switch (format) {
-        case 'csv':
-          exportAsCSV(exportData);
-          break;
-        case 'json':
-          exportAsJSON(exportData);
-          break;
-        case 'markdown':
-          exportAsMarkdown(exportData);
-          break;
-        default:
-          console.error('Unknown export format:', format);
-          return;
-      }
-      
-      setSuccessMessage(`✅ Exported ${exportData.length} rows as ${format.toUpperCase()}!`);
-      setTimeout(() => setSuccessMessage(''), 3000);
-    } catch (err) {
-      console.error('Export error:', err);
-      setError('Failed to export test cases');
+  // Export Logic
+  const handleExport = (format, data) => {
+    const exportData = data?.length ? data : testCases;
+    if (!exportData?.length) { 
+        alert('There is no data available for export'); 
+        return; 
     }
+
+    const timestamp = new Date().toISOString().slice(0, 10);
+
+    if (format === 'csv') {
+      const headers = ['ID','Work Item Type','Title','Test Step','Step Action','Step Expected','Area Path','Assigned To','State','Scenario Type'];
+      const rows = exportData.map(tc =>
+        [tc.id||'', tc.workItemType||'', tc.title||'', tc.testStep||'',
+         tc.stepAction||'', tc.stepExpected||'', tc.areaPath||'',
+         tc.assignedTo||'', tc.state||'', tc.scenarioType||'']
+          .map(v => `"${String(v).replace(/"/g,'""')}"`)
+          .join(',')
+      );
+      
+      const csvContent = [headers.join(','), ...rows].join('');
+      download(csvContent, 'text/csv', `test-cases-${timestamp}.csv`);
+
+    } else if (format === 'json') {
+      const jsonContent = JSON.stringify({ 
+        exportDate: new Date().toISOString(), 
+        total: exportData.length, 
+        testCases: exportData 
+      }, null, 2);
+      download(jsonContent, 'application/json', `test-cases-${timestamp}.json`);
+
+    } else if (format === 'markdown') {
+      const headers = ['ID','Type','Title','Step','Action','Expected','Area','Assigned'];
+      let md = `# Test Case Export — ${timestamp}
+
+**Total Rows:** ${exportData.length}
+
+`;
+      md += `| ${headers.join(' | ')} |
+| ${headers.map(()=>'---').join(' | ')} |
+`;
+      
+      exportData.forEach(tc => {
+        md += `| ${[
+            tc.id||'', 
+            tc.workItemType||'', 
+            (tc.title||'').replace(/\|/g,'\\|'),
+            tc.testStep||'', 
+            (tc.stepAction||'').replace(/\|/g,'\\|'),
+            (tc.stepExpected||'').replace(/\|/g,'\\|'), 
+            tc.areaPath||'', 
+            tc.assignedTo||''
+        ].join(' | ')} |
+`;
+      });
+      download(md, 'text/markdown', `test-cases-${timestamp}.md`);
+    }
+
+    setSuccess(`Exported ${exportData.length} records as ${format.toUpperCase()}`);
   };
 
-  // Export as CSV
-  const exportAsCSV = (data) => {
-    const headers = [
-      'ID',
-      'Work Item Type',
-      'Title',
-      'Test Step',
-      'Step Action',
-      'Step Expected',
-      'Area Path',
-      'Assigned To',
-      'State',
-      'Scenario Type'
-    ];
-    
-    const rows = data.map(tc => [
-      tc.id || '',
-      tc.workItemType || '',
-      tc.title || '',
-      tc.testStep || '',
-      tc.stepAction || '',
-      tc.stepExpected || '',
-      tc.areaPath || '',
-      tc.assignedTo || '',
-      tc.state || '',
-      tc.scenarioType || ''
-    ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
-
-    downloadFile(csvContent, 'text/csv', 'test-cases.csv');
-  };
-
-  // Export as JSON
-  const exportAsJSON = (data) => {
-    const exportObj = {
-      exportDate: new Date().toISOString(),
-      totalRows: data.length,
-      testCases: data
-    };
-    const dataStr = JSON.stringify(exportObj, null, 2);
-    downloadFile(dataStr, 'application/json', 'test-cases.json');
-  };
-
-  // Export as Markdown
-  const exportAsMarkdown = (data) => {
-    const headers = [
-      'ID',
-      'Work Item Type',
-      'Title',
-      'Test Step',
-      'Step Action',
-      'Step Expected',
-      'Area Path',
-      'Assigned To',
-      'State'
-    ];
-    
-    let markdown = '# Test Cases Export\n\n';
-    markdown += `**Export Date:** ${new Date().toLocaleString()}\n\n`;
-    markdown += `**Total Rows:** ${data.length}\n\n`;
-    markdown += '---\n\n';
-    markdown += '| ' + headers.join(' | ') + ' |\n';
-    markdown += '| ' + headers.map(() => '---').join(' | ') + ' |\n';
-    
-    data.forEach(tc => {
-      const row = [
-        tc.id || '',
-        tc.workItemType || '',
-        (tc.title || '').replace(/\|/g, '\\|'),
-        tc.testStep || '',
-        (tc.stepAction || '').replace(/\|/g, '\\|'),
-        (tc.stepExpected || '').replace(/\|/g, '\\|'),
-        tc.areaPath || '',
-        tc.assignedTo || '',
-        tc.state || ''
-      ];
-      markdown += '| ' + row.join(' | ') + ' |\n';
-    });
-
-    downloadFile(markdown, 'text/markdown', 'test-cases.md');
-  };
-
-  // Download file helper
-  const downloadFile = (content, mimeType, filename) => {
-    const blob = new Blob([content], { type: mimeType });
-    const url = window.URL.createObjectURL(blob);
+  const download = (content, mime, filename) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
   };
 
-  // Show splash screen
-  if (showSplash) {
-    return <SplashScreen />;
-  }
+  if (showSplash) return <SplashScreen />;
 
   return (
     <div className="App">
-      {/* Header */}
-      <header className="app-header">
-        <div className="header-content">
-          <div className="logo-section">
-            <Logo size="small" />
-          </div>
-          <nav className="header-nav">
-            <button 
-              className={`nav-btn ${currentPage === 'generate' ? 'active' : ''}`}
-              onClick={() => setCurrentPage('generate')}
-            >
-              <span>✨</span> Generate
-            </button>
-            <button 
-              className={`nav-btn ${currentPage === 'history' ? 'active' : ''}`}
-              onClick={() => setCurrentPage('history')}
-            >
-              <span>📚</span> History ({allTestCases.length})
-            </button>
-          </nav>
-        </div>
-      </header>
+      {loading && <LoadingOverlay />}
 
-      {/* Main Content */}
+      <Header
+        currentPage={page}
+        onPageChange={setPage}
+        historyCount={allTestCases.length}
+      />
+
       <main className="app-main">
         <div className="container">
-          {/* Error Banner */}
+
+          {/* Professional Status Banners */}
           {error && (
             <div className="message-banner error-banner">
-              <span>⚠️ {error}</span>
-              <button onClick={() => setError('')}>×</button>
+              <FaExclamationTriangle className="banner-icon" />
+              <span className="banner-text">{error}</span>
+              <button className="banner-close" onClick={() => setError('')}>
+                <FaTimes />
+              </button>
             </div>
           )}
-
-          {/* Success Banner */}
-          {successMessage && (
+          {success && (
             <div className="message-banner success-banner">
-              <span>{successMessage}</span>
-              <button onClick={() => setSuccessMessage('')}>×</button>
+              <FaCheckCircle className="banner-icon" />
+              <span className="banner-text">{success}</span>
+              <button className="banner-close" onClick={() => setSuccess('')}>
+                <FaTimes />
+              </button>
             </div>
           )}
 
-          {/* Generate Page */}
-          {currentPage === 'generate' ? (
+          {/* Generate View */}
+          {page === 'generate' && (
             <>
-              {/* Test Case Form */}
-              <TestCaseForm 
-                onGenerate={handleGenerateTestCases} 
+              <TestCaseForm
+                onGenerate={handleGenerate}
                 loading={loading}
               />
 
-              {/* Statistics */}
-              {stats && <Statistics stats={stats} />}
-
-              {/* Generated Test Cases */}
               {testCases.length > 0 && (
-                <>
-                  {/* Export Section */}
-                  <div className="export-section">
-                    <div className="export-header">
-                      <h3>📥 Export Current Results</h3>
-                      <p>Export {testCases.length} rows from current generation</p>
+                <div className="export-section">
+                  <div className="export-section-header">
+                    <div className="export-section-title">
+                      <FaDownload className="export-title-icon" />
+                      <h3>Export Generated Results</h3>
                     </div>
-                    <div className="export-buttons">
-                      <button 
-                        className="export-btn csv-btn"
-                        onClick={() => handleExportTestCases('csv', testCases)}
-                      >
-                        <span className="btn-icon">📄</span>
-                        <span className="btn-text">Export CSV</span>
-                      </button>
-                      <button 
-                        className="export-btn json-btn"
-                        onClick={() => handleExportTestCases('json', testCases)}
-                      >
-                        <span className="btn-icon">📋</span>
-                        <span className="btn-text">Export JSON</span>
-                      </button>
-                      <button 
-                        className="export-btn markdown-btn"
-                        onClick={() => handleExportTestCases('markdown', testCases)}
-                      >
-                        <span className="btn-icon">📝</span>
-                        <span className="btn-text">Export Markdown</span>
-                      </button>
-                    </div>
+                    <span className="export-section-badge">{testCases.length} Rows</span>
                   </div>
-
-                  {/* Test Case List */}
-                  <TestCaseList 
-                    testCases={testCases}
-                    onDelete={handleDeleteTestCase}
-                    title="Current Generation Results"
-                  />
-                </>
+                  <div className="export-buttons-grid">
+                    <button className="export-action-btn csv" onClick={() => handleExport('csv', testCases)}>
+                      <FaFileCsv /> Export CSV
+                    </button>
+                    <button className="export-action-btn json" onClick={() => handleExport('json', testCases)}>
+                      <FaFileCode /> Export JSON
+                    </button>
+                    <button className="export-action-btn markdown" onClick={() => handleExport('markdown', testCases)}>
+                      <FaMarkdown /> Export Markdown
+                    </button>
+                  </div>
+                </div>
               )}
+
+              {testCases.length > 0 && (
+                <TestCaseList
+                  testCases={testCases}
+                  onDelete={handleDelete}
+                  title="Session Results"
+                />
+              )}
+
+              {stats.total > 0 && <Statistics stats={stats} />}
             </>
-          ) : (
-            /* History Page */
-            <TestCaseHistory 
+          )}
+
+          {/* History View */}
+          {page === 'history' && (
+            <TestCaseHistory
               testCases={allTestCases}
-              onDelete={handleDeleteTestCase}
+              onDelete={handleDelete}
               onClearAll={handleClearAll}
-              onExport={handleExportTestCases}
+              onExport={handleExport}
             />
           )}
+
+          {/* Insights View */}
+          {page === 'statistics' && (
+            <Statistics stats={stats} fullPage />
+          )}
+
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="app-footer">
-        <div className="footer-content">
-          <p>© 2024 TestForge AI</p>
-          <p>Powered by <strong>Groq AI</strong> | Built for <strong>Azure DevOps</strong></p>
+        <div className="container footer-content">
+          <div className="footer-brand">
+            <span className="copyright">© 2026</span>
+            <span className="brand-name">TestForge <span className="crimson">AI</span></span>
+            <span className="footer-divider">|</span>
+            <span className="engine-info">
+              <FaMicrochip className="footer-icon" /> Powered by <strong>Groq (Llama-3.3-70b)</strong>
+            </span>
+          </div>
+          <div className="footer-links">
+            <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="footer-link">
+              <FaTerminal className="link-icon" /> Groq Console
+            </a>
+            <a href="https://github.com/justforstories1998-eng/testforge-ai" target="_blank" rel="noopener noreferrer" className="footer-link">
+              <FaGithub className="link-icon" /> GitHub
+            </a>
+          </div>
         </div>
       </footer>
     </div>

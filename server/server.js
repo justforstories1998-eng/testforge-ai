@@ -1,16 +1,21 @@
+// server/server.js - CORRECT ORDER
+
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
-// Load environment variables
-dotenv.config();
+// 1. Load environment variables FIRST.
+// This makes process.env.GROQ_API_KEY available to all subsequent files.
+dotenv.config({ path: '../.env' }); 
 
-// Import routes
+// 2. Now, require your routes and controllers.
+// When testCaseRoutes -> testCaseController -> groqService runs, the key will exist.
 const testCaseRoutes = require('./routes/testCaseRoutes');
 const exportRoutes = require('./routes/exportRoutes');
 
-// Initialize Express app
+// 3. Initialize Express app and the rest of your middleware
 const app = express();
+// ... rest of your server code
 
 // Middleware
 app.use(cors({
