@@ -44,22 +44,27 @@ function App() {
   }, []);
 
   // Fetch all data from backend
-  const fetchAll = useCallback(async () => {
-    try {
-      const [casesRes, statsRes] = await Promise.all([
-        axios.get(`${API_URL}/testcases`),
-        axios.get(`${API_URL}/testcases/statistics`),
-      ]);
-      setAllTestCases(casesRes.data || []);
-      setStats({
-        total: statsRes.data.total || 0,
-        byScenarioType: statsRes.data.byScenarioType || {},
-        byPriority: statsRes.data.byPriority || {},
-      });
-    } catch (err) {
-      console.error('Fetch error:', err);
-    }
-  }, []);
+const fetchAll = useCallback(async () => {
+  try {
+    const [casesRes, statsRes] = await Promise.all([
+      axios.get(`${API_URL}/testcases`),
+      axios.get(`${API_URL}/testcases/statistics`),
+    ]);
+
+    // Ensure we are setting an array. If casesRes.data is not an array, set empty [].
+    const data = Array.isArray(casesRes.data) ? casesRes.data : [];
+    setAllTestCases(data);
+    
+    setStats({
+      total: statsRes.data.total || 0,
+      byScenarioType: statsRes.data.byScenarioType || {},
+      byPriority: statsRes.data.byPriority || {},
+    });
+  } catch (err) {
+    console.error('Fetch error:', err);
+    setAllTestCases([]); // Set to empty array on error
+  }
+}, []);
 
   useEffect(() => {
     if (!showSplash) fetchAll();

@@ -15,7 +15,10 @@ import TestCaseList from './TestCaseList';
 function TestCaseHistory({ testCases, onDelete, onClearAll, onExport }) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredTestCases = (testCases || []).filter(tc => {
+  // SAFE ARRAY CHECK: Ensures the app never crashes if data is not an array
+  const safeTestCases = Array.isArray(testCases) ? testCases : [];
+
+  const filteredTestCases = safeTestCases.filter(tc => {
     const searchStr = searchTerm.toLowerCase();
     return (
       (tc.title || '').toLowerCase().includes(searchStr) ||
@@ -43,8 +46,8 @@ function TestCaseHistory({ testCases, onDelete, onClearAll, onExport }) {
         </button>
       </div>
 
-      {/* Export Section - Redesigned to look like a premium card */}
-      {testCases.length > 0 && (
+      {/* Export Section */}
+      {safeTestCases.length > 0 && (
         <div className="repo-export-card">
           <div className="repo-export-header">
             <FaFileExport className="repo-export-icon" />
@@ -52,13 +55,13 @@ function TestCaseHistory({ testCases, onDelete, onClearAll, onExport }) {
           </div>
           
           <div className="repo-export-actions">
-            <button className="repo-btn-secondary" onClick={() => onExport('csv', testCases)}>
+            <button className="repo-btn-secondary" onClick={() => onExport('csv', safeTestCases)}>
               <FaFileCsv className="icon-csv" /> Export CSV
             </button>
-            <button className="repo-btn-secondary" onClick={() => onExport('json', testCases)}>
+            <button className="repo-btn-secondary" onClick={() => onExport('json', safeTestCases)}>
               <FaFileCode className="icon-json" /> Export JSON
             </button>
-            <button className="repo-btn-secondary" onClick={() => onExport('markdown', testCases)}>
+            <button className="repo-btn-secondary" onClick={() => onExport('markdown', safeTestCases)}>
               <FaMarkdown className="icon-md" /> Export Markdown
             </button>
           </div>

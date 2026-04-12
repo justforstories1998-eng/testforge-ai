@@ -1,0 +1,15 @@
+[build]
+  # Tell Netlify the frontend code is in the client folder
+  base = "client"
+  
+  # Use the production build command, NOT the start command
+  command = "npm run build"
+  
+  # Tell Netlify where the finished files will be
+  publish = "build"
+
+# This part fixes the "404 on refresh" error common in React apps
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
