@@ -1,111 +1,117 @@
-// server/server.js - CORRECT ORDER
-
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 
-// 1. Load environment variables FIRST.
-// This makes process.env.GROQ_API_KEY available to all subsequent files.
+// 1. Load environment variables FIRST
+// This ensures GROQ_API_KEY is available globally immediately
 dotenv.config({ path: '../.env' }); 
 
-// 2. Now, require your routes and controllers.
-// When testCaseRoutes -> testCaseController -> groqService runs, the key will exist.
+// 2. Import routes
 const testCaseRoutes = require('./routes/testCaseRoutes');
 const exportRoutes = require('./routes/exportRoutes');
 
-// 3. Initialize Express app and the rest of your middleware
 const app = express();
-// ... rest of your server code
 
-// Middleware
-app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
-  credentials: true
-}));
+// 3. Unified CORS Configuration
+// This handles both local development and your production Netlify site
+const allowedOrigins = [
+  'https://testforge-ai.netlify.app',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Access denied by CORS policy'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
+
+// Explicitly handle OPTIONS (preflight) requests for all routes
+app.options('*', cors(corsOptions));
+
+// 4. Body Parsing Middleware
+// Limits are set to 10mb to handle potential image uploads or large user stories
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Request logging middleware
+// Request logging for debugging
 app.use((req, res, next) => {
-  console.log(`📨 ${req.method} ${req.path}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} request to ${req.path}`);
   next();
 });
 
-app.use(cors({
-  origin: 'https://testforge-ai.netlify.app',
-  methods: ['GET', 'POST', 'DELETE', 'PUT'],
-  credentials: true
-}));
-
-// Routes
+// 5. API Routes
 app.use('/api/testcases', testCaseRoutes);
 app.use('/api/export', exportRoutes);
 
-// Health check route
+// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
-    status: 'OK',
-    message: 'Server is running',
+    status: 'Healthy',
     timestamp: new Date().toISOString(),
-    storage: 'In-Memory',
-    groqApiKey: process.env.GROQ_API_KEY ? 'Configured' : 'Missing'
+    engine: 'Groq Llama-3.3',
+    apiKeyStatus: process.env.GROQ_API_KEY ? 'Active' : 'Missing'
   });
 });
 
-// Root route
+// Root endpoint
 app.get('/', (req, res) => {
   res.json({
-    message: 'Welcome to Generate Test Case API',
+    name: 'TestForge AI API',
     version: '1.0.0',
-    storage: 'In-Memory',
-    endpoints: {
-      health: '/api/health',
-      testcases: '/api/testcases',
-      generate: '/api/testcases/generate',
-      statistics: '/api/testcases/statistics',
-      export: '/api/export'
-    }
+    status: 'Operational'
   });
 });
 
-// 404 handler
+// 404 Route handler
 app.use((req, res) => {
   res.status(404).json({
-    error: 'Route not found',
+    error: 'The requested resource was not found on this server',
     path: req.path
   });
 });
 
-// Error handler
+// Global Error Handler
 app.use((err, req, res, next) => {
-  console.error('❌ Error:', err);
+  console.error('Internal Server Error:', err.message);
   res.status(err.status || 500).json({
-    error: err.message || 'Internal Server Error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    error: err.message || 'An unexpected server error occurred',
+    success: false
   });
 });
 
-// Start server
+// 6. Start Server
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log('═══════════════════════════════════════════════════════════');
-  console.log('✅ Server started successfully!');
-  console.log(`🚀 Server is running on port ${PORT}`);
-  console.log(`📍 API URL: http://localhost:${PORT}/api`);
-  console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
-  console.log(`💾 Storage: In-Memory (no database)`);
-  console.log(`🔑 Groq API Key: ${process.env.GROQ_API_KEY ? 'Configured ✓' : 'Missing ✗'}`);
-  console.log('═══════════════════════════════════════════════════════════');
+  console.log('-----------------------------------------------------------');
+  console.log(`System: TestForge AI Backend Protocol`);
+  console.log(`Status: Operational on Port ${PORT}`);
+  console.log(`CORS: Allowed for ${allowedOrigins.join(', ')}`);
+  console.log(`AI Configuration: ${process.env.GROQ_API_KEY ? 'Validated' : 'Action Required'}`);
+  console.log('-----------------------------------------------------------');
 });
 
-// Handle unhandled promise rejections
+// Process handlers for stability
 process.on('unhandledRejection', (err) => {
-  console.error('❌ Unhandled Rejection:', err);
+  console.error('Unhandled Promise Rejection:', err);
 });
 
-// Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
-  console.error('❌ Uncaught Exception:', err);
+  console.error('Uncaught Exception Error:', err);
   process.exit(1);
 });
