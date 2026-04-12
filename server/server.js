@@ -32,7 +32,8 @@ app.use((req, res, next) => {
 });
 
 app.use(cors({
-  origin: ['https://testforge-ai.netlify.app', 'http://localhost:3000'],
+  origin: 'https://testforge-ai.netlify.app',
+  methods: ['GET', 'POST', 'DELETE', 'PUT'],
   credentials: true
 }));
 

@@ -23,9 +23,7 @@ import Statistics from './components/Statistics';
 import SplashScreen from './components/SplashScreen';
 import LoadingOverlay from './components/LoadingOverlay';
 
-const API_URL = process.env.NODE_ENV === 'production'
-  ? '/api'
-  : (process.env.REACT_APP_API_URL || 'http://localhost:5000/api');
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 function App() {
   const [page, setPage] = useState('generate');
