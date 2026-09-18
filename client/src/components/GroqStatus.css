@@ -3,17 +3,16 @@
   align-items: center;
   gap: 0.85rem;
   padding: 0.85rem 1.1rem;
-  border-radius: 16px;
-  border: 1px solid var(--neu-accent-border);
-  background: var(--neu-surface);
-  box-shadow: var(--neu-ex-sm);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
   margin-bottom: 1.5rem;
   font-size: 0.9rem;
 }
 
 .groq-dot {
-  width: 11px;
-  height: 11px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -23,6 +22,7 @@
   flex-direction: column;
   gap: 0.15rem;
   flex: 1;
+  min-width: 0;
 }
 
 .groq-title {
@@ -30,34 +30,39 @@
   display: flex;
   align-items: center;
   gap: 0.45rem;
+  color: var(--text);
 }
 
 .groq-detail {
-  font-size: 0.82rem;
-  opacity: 0.9;
-  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  word-break: break-word;
 }
 
 .groq-retry {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.45rem 0.9rem;
-  border-radius: 12px;
-  border: 1px solid var(--neu-accent-border);
-  background: var(--neu-surface);
-  box-shadow: var(--neu-ex-sm);
+  padding: 0.5rem 0.95rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
   color: inherit;
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-body);
   font-weight: 700;
   font-size: 0.8rem;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.2s var(--neu-ease);
+  transition: all 0.18s var(--ease);
+  min-height: 38px;
+}
+
+.groq-retry:hover:not(:disabled) {
+  border-color: var(--border-accent);
 }
 
 .groq-retry:active:not(:disabled) {
-  box-shadow: var(--neu-in-sm);
   transform: translateY(2px);
 }
 
@@ -67,47 +72,101 @@
 }
 
 .groq-checking {
-  color: var(--neu-muted);
+  color: var(--muted);
 }
 
 .groq-checking .groq-dot {
-  background: var(--neu-faint);
+  background: var(--faint);
   animation: groqPulse 1.2s ease-in-out infinite;
-}
-
-.groq-waking {
-  color: var(--neu-text);
-  border-color: rgba(244, 63, 94, 0.45);
-  background: linear-gradient(145deg, #2a1218, var(--neu-surface));
-}
-
-.groq-waking .groq-dot {
-  background: var(--neu-accent);
-  animation: groqPulse 1.2s ease-in-out infinite;
-  box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.18), 0 0 12px var(--neu-accent-glow);
 }
 
 .groq-connected {
-  color: var(--neu-text);
-  border-color: rgba(244, 63, 94, 0.45);
-  background: linear-gradient(145deg, #2a1218, var(--neu-surface));
+  color: var(--text);
+  border-color: var(--border-accent);
+  background: linear-gradient(180deg, rgba(244, 63, 94, 0.1), var(--surface));
 }
 
 .groq-connected .groq-dot {
-  background: var(--neu-accent);
-  box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.18), 0 0 12px var(--neu-accent-glow);
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--glow);
 }
 
 .groq-disconnected {
   color: #fecdd3;
   border-color: rgba(244, 63, 94, 0.45);
-  background: linear-gradient(145deg, #2a1218, var(--neu-surface));
+  background: linear-gradient(180deg, rgba(244, 63, 94, 0.1), var(--surface));
 }
 
 .groq-disconnected .groq-dot {
   background: transparent;
-  border: 2px solid var(--neu-accent);
-  box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.12);
+  border: 2px solid var(--accent);
+}
+
+.groq-waking {
+  color: var(--text);
+  border-color: var(--border-accent);
+  background: linear-gradient(180deg, rgba(244, 63, 94, 0.1), var(--surface));
+}
+
+.groq-waking .groq-dot {
+  background: var(--accent);
+  animation: groqPulse 1.2s ease-in-out infinite;
+  box-shadow: 0 0 10px var(--glow);
+}
+
+/* Compact pill for the topbar */
+.groq-compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--r-full);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.18s var(--ease);
+  min-height: 36px;
+}
+
+.groq-compact:hover:not(:disabled) {
+  border-color: var(--border-accent);
+  color: var(--text);
+}
+
+.groq-compact:disabled {
+  cursor: default;
+}
+
+.groq-compact.groq-connected {
+  color: var(--text);
+  border-color: var(--border-accent);
+  background: var(--accent-faint);
+}
+
+.groq-compact .groq-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.groq-compact.groq-connected .groq-dot {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--glow);
+}
+
+.groq-compact.groq-disconnected .groq-dot {
+  background: transparent;
+  border: 2px solid var(--accent);
+}
+
+.groq-compact.groq-checking .groq-dot,
+.groq-compact.groq-waking .groq-dot {
+  background: var(--accent);
+  animation: groqPulse 1.2s ease-in-out infinite;
 }
 
 .groq-spin {
@@ -121,4 +180,14 @@
 @keyframes groqPulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
+}
+
+@media (max-width: 560px) {
+  .groq-compact-text {
+    display: none;
+  }
+
+  .groq-compact {
+    padding: 0.45rem 0.65rem;
+  }
 }

@@ -1,221 +1,210 @@
-/* Container to center the card */
 .tc-form-container {
-  padding: 2rem 1rem;
-  display: flex;
-  justify-content: center;
+  padding: 0;
+  display: block;
+  min-width: 0;
 }
 
-/* Main Card Wrapper — extruded bento card */
 .tc-form-card {
-  background: var(--neu-surface);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
   width: 100%;
-  max-width: 850px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--neu-accent-border);
-  box-shadow: var(--neu-ex);
-  padding: 2.5rem;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  padding: clamp(1.25rem, 2.5vw, 2.25rem);
 }
 
-/* Header Styling */
 .tc-form-header {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
-  margin-bottom: 2.5rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--neu-accent-border);
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .tc-header-icon {
-  font-size: 2rem;
-  color: var(--neu-accent);
-  width: 48px;
-  height: 48px;
+  font-size: 1.4rem;
+  color: var(--accent);
+  width: 46px;
+  height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--neu-inset);
-  border: 1px solid var(--neu-accent-border);
-  border-radius: 16px;
-  box-shadow: var(--neu-in);
+  background: var(--accent-soft);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--r-md);
   flex-shrink: 0;
 }
 
 .tc-header-text h2 {
   margin: 0;
-  font-size: 1.6rem;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  color: var(--neu-text);
+  font-size: 1.3rem;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
 .tc-header-text p {
-  margin: 0.2rem 0 0;
-  color: var(--neu-muted);
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 
-/* Error banner */
 .tc-error-banner {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  background: linear-gradient(145deg, #2a1218, var(--neu-surface));
+  background: rgba(244, 63, 94, 0.1);
   border: 1px solid rgba(244, 63, 94, 0.45);
   color: #fecdd3;
-  border-radius: var(--radius-md);
-  padding: 0.85rem 1.1rem;
-  margin-bottom: 1.5rem;
-  font-size: 0.9rem;
+  border-radius: var(--r-md);
+  padding: 0.8rem 1rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.88rem;
   font-weight: 500;
 }
 
-/* Form Layout */
 .tc-main-form {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .tc-form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
-/* Individual Group Logic */
 .tc-form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.45rem;
+  min-width: 0;
 }
 
 .tc-full-width {
-  grid-column: span 2;
+  grid-column: 1 / -1;
 }
 
-/* Technical labels: uppercase, 10px, tracking-widest */
 .tc-label {
   display: flex;
   align-items: center;
-  font-size: 10px;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--neu-muted);
+  color: var(--muted);
 }
 
 .tc-label-icon {
-  color: var(--neu-accent);
-  margin-right: 0.6rem;
-  font-size: 0.9rem;
+  color: var(--accent);
+  margin-right: 0.5rem;
+  font-size: 0.8rem;
 }
 
-/* Inputs, Textarea, and Selects — inset rectangles */
 .tc-main-form input[type="text"],
 .tc-main-form input[type="number"],
 .tc-main-form select,
 .tc-main-form textarea {
   width: 100%;
   box-sizing: border-box;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--neu-accent-border);
-  border-radius: 16px;
-  background-color: var(--neu-inset);
-  box-shadow: var(--neu-in-sm);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 0.95rem;
-  color: var(--neu-text);
-  transition: all 0.2s var(--neu-ease);
+  padding: 0.72rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background-color: var(--inset);
+  font-family: var(--font-body);
+  font-size: 0.93rem;
+  color: var(--text);
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+  min-height: 44px;
 }
 
 .tc-main-form textarea {
   resize: vertical;
-  min-height: 100px;
+  min-height: 110px;
   line-height: 1.6;
 }
 
 .tc-main-form select {
   appearance: none;
   cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23f43f5e' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.9rem center;
+  padding-right: 2.4rem;
 }
 
-/* Focus States */
 .tc-main-form input:focus,
 .tc-main-form select:focus,
 .tc-main-form textarea:focus {
   outline: none;
-  border-color: var(--neu-accent);
-  box-shadow: var(--neu-in-sm), 0 0 0 3px rgba(244, 63, 94, 0.18);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.18);
 }
 
-/* Disabled State for Comprehensive Mode */
 .tc-main-form input:disabled {
-  background-color: var(--neu-inset);
-  border-color: var(--neu-accent-border);
-  color: var(--neu-faint);
+  opacity: 0.55;
   cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.tc-main-form input:disabled::placeholder {
-  color: var(--neu-accent);
-  font-weight: 700;
 }
 
 .tc-main-form input::placeholder,
 .tc-main-form textarea::placeholder {
-  color: var(--neu-faint);
+  color: var(--faint);
 }
 
-/* Number input spinners */
 .tc-main-form input[type="number"]::-webkit-inner-spin-button {
   opacity: 0.4;
 }
 
-/* Checkboxes — inset control group */
 .tc-checkbox-group {
   display: flex;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  background: var(--neu-inset);
-  border-radius: 16px;
-  border: 1px solid var(--neu-accent-border);
-  box-shadow: var(--neu-in-sm);
+  gap: 0.6rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--inset);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
   flex-wrap: wrap;
 }
 
 .tc-checkbox-item {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--neu-text);
+  gap: 0.55rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
   cursor: pointer;
+  padding: 0.35rem 0.7rem 0.35rem 0.35rem;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  transition: all 0.18s var(--ease);
+  min-height: 40px;
 }
 
-/* Custom neumorphic checkbox: 24px inset, red fill + white check */
+.tc-checkbox-item:hover {
+  border-color: var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
 .tc-checkbox-item input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: var(--neu-inset);
-  border: 1px solid var(--neu-accent-border);
-  box-shadow: var(--neu-in-sm);
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   cursor: pointer;
   position: relative;
   flex-shrink: 0;
-  transition: all 0.2s var(--neu-ease);
+  transition: all 0.18s var(--ease);
   margin: 0;
 }
 
 .tc-checkbox-item input[type="checkbox"]:checked {
-  background: var(--neu-accent);
-  border-color: var(--neu-accent);
-  box-shadow: 0 0 12px rgba(244, 63, 94, 0.5);
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 10px rgba(244, 63, 94, 0.45);
 }
 
 .tc-checkbox-item input[type="checkbox"]:checked::after {
@@ -226,52 +215,47 @@
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
 }
 
 .tc-checkbox-item input[type="checkbox"]:active {
-  transform: translateY(2px);
+  transform: translateY(1px);
 }
 
-/* Submit Button — primary extruded CTA */
 .tc-submit-btn {
-  background: linear-gradient(145deg, var(--neu-accent), var(--neu-accent-deep));
+  background: linear-gradient(145deg, var(--accent), var(--accent-deep));
   color: #fff;
-  border: 1px solid rgba(244, 63, 94, 0.5);
-  padding: 1rem;
-  border-radius: 20px;
-  font-family: 'DM Sans', sans-serif;
+  border: none;
+  padding: 0.95rem;
+  border-radius: var(--r-md);
+  font-family: var(--font-body);
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 1rem;
   cursor: pointer;
-  margin-top: 1rem;
-  box-shadow: var(--neu-ex-sm), 0 0 20px rgba(244, 63, 94, 0.3);
-  transition: all 0.2s var(--neu-ease);
+  margin-top: 0.5rem;
+  min-height: 52px;
+  box-shadow: 0 8px 24px rgba(244, 63, 94, 0.35);
+  transition: all 0.18s var(--ease);
 }
 
 .tc-submit-btn:hover:not(:disabled) {
-  box-shadow: var(--neu-ex-sm), 0 0 28px rgba(244, 63, 94, 0.5);
   filter: brightness(1.08);
+  box-shadow: 0 10px 30px rgba(244, 63, 94, 0.45);
 }
 
 .tc-submit-btn:active:not(:disabled) {
-  box-shadow: var(--neu-in-sm);
   transform: translateY(2px);
 }
 
 .tc-submit-btn:disabled {
-  opacity: 0.55;
+  opacity: 0.6;
   cursor: not-allowed;
-  box-shadow: var(--neu-in-sm);
+  box-shadow: none;
 }
 
-/* Responsive */
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .tc-form-row {
     grid-template-columns: 1fr;
-  }
-  .tc-form-card {
-    padding: 1.5rem;
   }
 }

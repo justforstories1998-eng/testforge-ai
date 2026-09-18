@@ -8,8 +8,36 @@ function shortModelName(model) {
   return last || 'Groq AI';
 }
 
-function GroqStatus({ status, onRetry }) {
+function GroqStatus({ status, onRetry, compact = false }) {
   const state = status?.state || 'checking';
+
+  if (compact) {
+    const short =
+      state === 'connected'
+        ? status?.rateLimited
+          ? 'AI · limited'
+          : 'AI connected'
+        : state === 'waking'
+          ? `Waking… ${Math.round((status?.elapsedMs || 0) / 1000)}s`
+          : state === 'checking'
+            ? 'Checking…'
+            : 'AI offline';
+    return (
+      <button
+        type="button"
+        className={`groq-compact groq-${state}`}
+        onClick={onRetry}
+        disabled={state === 'checking' || state === 'waking' || !onRetry}
+        title={status?.message || 'AI connection status — click to retry'}
+      >
+        <span className="groq-dot" aria-hidden="true" />
+        <span className="groq-compact-text">{short}</span>
+        {(state === 'checking' || state === 'waking') && (
+          <FaSpinner className="groq-spin" aria-hidden="true" />
+        )}
+      </button>
+    );
+  }
 
   const config = {
     checking: {

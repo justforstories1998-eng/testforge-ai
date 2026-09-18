@@ -1,27 +1,26 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  FaExclamationTriangle, 
-  FaCheckCircle, 
-  FaDownload, 
-  FaFileCsv, 
-  FaFileCode, 
-  FaMarkdown, 
+import {
+  FaExclamationTriangle,
+  FaCheckCircle,
   FaTimes,
-  FaFlask,
-  FaMicrochip, // Changed from FaCpu to FaMicrochip
-  FaTerminal,
+  FaMicrochip,
   FaGithub
 } from 'react-icons/fa';
 import './App.css';
 
-// Components
-import Header from './components/Header';
-import TestCaseForm from './components/TestCaseForm';
-import TestCaseList from './components/TestCaseList';
-import TestCaseHistory from './components/TestCaseHistory';
-import Statistics from './components/Statistics';
+// Shell
+import Sidebar from './components/Sidebar';
+import Topbar from './components/Topbar';
+import GroqStatus from './components/GroqStatus';
+
+// Pages
+import GeneratePage from './pages/GeneratePage';
+import HistoryPage from './pages/HistoryPage';
+import InsightsPage from './pages/InsightsPage';
+
+// Overlays
 import LoadingOverlay from './components/LoadingOverlay';
 import PlaywrightExportModal from './components/PlaywrightExportModal';
 import LandingPage from './components/LandingPage';
@@ -42,6 +41,21 @@ const PAGE_FOR_PATH = {
   '/generate': 'generate',
   '/repository': 'history',
   '/insights': 'statistics',
+};
+
+const TOPBAR_META = {
+  generate: {
+    title: 'Generate test cases',
+    sub: 'Turn acceptance criteria into full test suites',
+  },
+  history: {
+    title: 'Repository',
+    sub: 'Every generation, searchable in one place',
+  },
+  statistics: {
+    title: 'Insights',
+    sub: 'Distribution across your test library',
+  },
 };
 
 function App() {
@@ -71,6 +85,7 @@ function Shell() {
   const [showPwModal, setShowPwModal] = useState(false);
   const [pwExportData, setPwExportData] = useState([]);
   const [groq, setGroq] = useState({ state: 'checking' });
+  const [navOpen, setNavOpen] = useState(false);
 
   // Fetch all data from backend
 const fetchAll = useCallback(async () => {
@@ -143,9 +158,10 @@ const fetchAll = useCallback(async () => {
     return () => clearInterval(t);
   }, [checkGroq]);
 
-  // Start each view at the top (route changes preserve scroll otherwise).
+  // Start each view at the top and close the mobile drawer.
   useEffect(() => {
     window.scrollTo(0, 0);
+    setNavOpen(false);
   }, [location.pathname]);
 
   // Auto-clear success messages
@@ -306,7 +322,7 @@ const fetchAll = useCallback(async () => {
   // Unknown URL — bounce home instead of rendering a blank view.
   if (!page) return <Navigate to="/" replace />;
 
-  // Cinematic landing — nav + hero only, no extra chrome.
+  // Cinematic landing — nav + hero only, no app chrome.
   if (page === 'landing') {
     return (
       <div className="App">
@@ -315,19 +331,39 @@ const fetchAll = useCallback(async () => {
     );
   }
 
+  const meta = TOPBAR_META[page] || TOPBAR_META.generate;
+
   return (
-    <div className="App">
+    <div className={`App app-shell ${navOpen ? 'nav-open' : ''}`}>
       {loading && <LoadingOverlay />}
 
-      <Header
+      <Sidebar
         currentPage={page}
-        onPageChange={setPage}
         historyCount={allTestCases.length}
-        onBrandClick={() => setPage('landing')}
+        groq={groq}
+        onNavigate={(p) => {
+          setPage(p);
+          setNavOpen(false);
+        }}
       />
+      {navOpen && (
+        <div
+          className="nav-scrim"
+          onClick={() => setNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
-      <main className="app-main">
-        <div className="container">
+      <div className="app-main-col">
+        <Topbar
+          title={meta.title}
+          sub={meta.sub}
+          navOpen={navOpen}
+          onMenu={() => setNavOpen((v) => !v)}
+          right={<GroqStatus status={groq} compact onRetry={retryGroqConnection} />}
+        />
+
+        <main className="page">
 
           {/* Professional Status Banners */}
           {error && (
@@ -351,55 +387,21 @@ const fetchAll = useCallback(async () => {
 
           {/* Generate View */}
           {page === 'generate' && (
-            <>
-              <TestCaseForm
-                onGenerate={handleGenerate}
-                loading={loading}
-                groqStatus={groq}
-                onRetryGroq={retryGroqConnection}
-              />
-
-              {testCases.length > 0 && (
-                <div className="export-section">
-                  <div className="export-section-header">
-                    <div className="export-section-title">
-                      <FaDownload className="export-title-icon" />
-                      <h3>Export Generated Results</h3>
-                    </div>
-                    <span className="export-section-badge">{testCases.length} Rows</span>
-                  </div>
-                  <div className="export-buttons-grid">
-                    <button className="export-action-btn csv" onClick={() => handleExport('csv', testCases)}>
-                      <FaFileCsv /> Export CSV
-                    </button>
-                    <button className="export-action-btn json" onClick={() => handleExport('json', testCases)}>
-                      <FaFileCode /> Export JSON
-                    </button>
-                    <button className="export-action-btn markdown" onClick={() => handleExport('markdown', testCases)}>
-                      <FaMarkdown /> Export Markdown
-                    </button>
-                    <button className="export-action-btn playwright" onClick={() => handleExport('playwright', testCases)}>
-                      <FaFlask /> Export Playwright .spec.ts
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {testCases.length > 0 && (
-                <TestCaseList
-                  testCases={testCases}
-                  onDelete={handleDelete}
-                  title="Session Results"
-                />
-              )}
-
-              {stats.total > 0 && <Statistics stats={stats} />}
-            </>
+            <GeneratePage
+              testCases={testCases}
+              stats={stats}
+              loading={loading}
+              groqStatus={groq}
+              onGenerate={handleGenerate}
+              onDelete={handleDelete}
+              onExport={handleExport}
+              onRetryGroq={retryGroqConnection}
+            />
           )}
 
           {/* History View */}
           {page === 'history' && (
-            <TestCaseHistory
+            <HistoryPage
               testCases={allTestCases}
               onDelete={handleDelete}
               onClearAll={handleClearAll}
@@ -408,33 +410,27 @@ const fetchAll = useCallback(async () => {
           )}
 
           {/* Insights View */}
-          {page === 'statistics' && (
-            <Statistics stats={stats} fullPage />
-          )}
+          {page === 'statistics' && <InsightsPage stats={stats} />}
 
-        </div>
-      </main>
+        </main>
 
-      <footer className="app-footer">
-        <div className="container footer-content">
-          <div className="footer-brand">
-            <span className="copyright">© 2026</span>
-            <span className="brand-name">Test-Case<span className="crimson">AI</span></span>
-            <span className="footer-divider">|</span>
-            <span className="engine-info">
-              <FaMicrochip className="footer-icon" /> Powered by <strong>Groq AI</strong>
-            </span>
-          </div>
-          <div className="footer-links">
-            <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="footer-link">
-              <FaTerminal className="link-icon" /> Groq Console
-            </a>
-            <a href="https://github.com/justforstories1998-eng/testforge-ai" target="_blank" rel="noopener noreferrer" className="footer-link">
-              <FaGithub className="link-icon" /> GitHub
-            </a>
-          </div>
-        </div>
-      </footer>
+        <footer className="app-footer">
+          <span className="foot-brand">
+            © 2026 <strong>Test-Case<em>AI</em></strong>
+          </span>
+          <span className="foot-meta mono">
+            <FaMicrochip /> Groq AI
+          </span>
+          <a
+            href="https://github.com/justforstories1998-eng/testforge-ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="foot-link"
+          >
+            <FaGithub /> GitHub
+          </a>
+        </footer>
+      </div>
 
       {showPwModal && (
         <PlaywrightExportModal
