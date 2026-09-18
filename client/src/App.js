@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { 
   FaExclamationTriangle, 
   FaCheckCircle, 
@@ -28,8 +29,39 @@ import { getGroqStatus } from './services/api';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
+// URL <-> view mapping. Browser back/forward works because every
+// view change pushes a real history entry.
+const PATH_FOR_PAGE = {
+  landing: '/',
+  generate: '/generate',
+  history: '/repository',
+  statistics: '/insights',
+};
+const PAGE_FOR_PATH = {
+  '/': 'landing',
+  '/generate': 'generate',
+  '/repository': 'history',
+  '/insights': 'statistics',
+};
+
 function App() {
-  const [page, setPage] = useState('landing');
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/*" element={<Shell />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+function Shell() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const page = PAGE_FOR_PATH[location.pathname] || null;
+  const setPage = useCallback(
+    (p) => navigate(PATH_FOR_PAGE[p] || '/'),
+    [navigate]
+  );
   const [testCases, setTestCases] = useState([]);
   const [allTestCases, setAllTestCases] = useState([]);
   const [stats, setStats] = useState({ total: 0, byScenarioType: {}, byPriority: {} });
@@ -87,6 +119,11 @@ const fetchAll = useCallback(async () => {
     const t = setInterval(() => checkGroq(false), 60000);
     return () => clearInterval(t);
   }, [checkGroq]);
+
+  // Start each view at the top (route changes preserve scroll otherwise).
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   // Auto-clear success messages
   useEffect(() => {
@@ -242,6 +279,9 @@ const fetchAll = useCallback(async () => {
     document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
   };
+
+  // Unknown URL — bounce home instead of rendering a blank view.
+  if (!page) return <Navigate to="/" replace />;
 
   // Cinematic landing — nav + hero only, no extra chrome.
   if (page === 'landing') {
