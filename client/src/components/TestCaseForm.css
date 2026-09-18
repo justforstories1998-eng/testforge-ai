@@ -36,6 +36,16 @@
   flex-shrink: 0;
 }
 
+.tc-header-icon-img {
+  width: 46px;
+  height: 46px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-accent);
+  box-shadow: 0 4px 16px rgba(244, 63, 94, 0.3);
+  flex-shrink: 0;
+  user-select: none;
+}
+
 .tc-header-text h2 {
   margin: 0;
   font-size: 1.3rem;

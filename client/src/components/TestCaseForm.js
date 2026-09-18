@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  FaMagic, 
   FaCheckCircle, 
   FaExclamationCircle, 
   FaLayerGroup, 
@@ -78,7 +77,13 @@ function TestCaseForm({ onGenerate, loading, groqStatus, onRetryGroq }) {
       <div className="tc-form-card">
         {/* Header Section */}
         <div className="tc-form-header">
-          <FaMagic className="tc-header-icon" />
+          <img
+            src={`${process.env.PUBLIC_URL}/wand-icon.png`}
+            alt=""
+            aria-hidden="true"
+            className="tc-header-icon-img"
+            draggable={false}
+          />
           <div className="tc-header-text">
             <h2>Generate Test Cases</h2>
             <p>Advanced AI modeling for enterprise-grade test suites</p>
