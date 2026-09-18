@@ -18,6 +18,7 @@ import GroqStatus from './GroqStatus';
 function TestCaseForm({ onGenerate, loading, groqStatus, onRetryGroq }) {
   const aiReady = groqStatus?.state === 'connected';
   const aiChecking = !groqStatus || groqStatus.state === 'checking';
+  const aiWaking = groqStatus?.state === 'waking';
   const [formData, setFormData] = useState({
     acceptanceCriteria: '',
     scenarioType: 'Positive',
@@ -247,7 +248,9 @@ function TestCaseForm({ onGenerate, loading, groqStatus, onRetryGroq }) {
           <button className="tc-submit-btn" type="submit" disabled={loading || !aiReady}>
             {loading
               ? 'AI Modeling Criteria...'
-              : aiChecking
+              : aiWaking
+                ? `Waking Server… (${Math.round((groqStatus?.elapsedMs || 0) / 1000)}s)`
+                : aiChecking
                 ? 'Checking AI Connection...'
                 : aiReady
                   ? 'Generate Scenarios'

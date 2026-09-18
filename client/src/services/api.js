@@ -88,6 +88,42 @@ export const getGroqStatus = async (fresh = false) => {
   }
 };
 
+// Wake a sleeping host (e.g. Render free tier spins down when idle and
+// needs up to ~a minute for a cold start). Polls the cheap /health
+// endpoint until the backend answers or the budget runs out.
+export const wakeBackend = async ({
+  budgetMs = 100000,
+  attemptTimeoutMs = 12000,
+  intervalMs = 3000,
+  onTick,
+} = {}) => {
+  const started = Date.now();
+  let attempt = 0;
+  for (;;) {
+    attempt++;
+    try {
+      const res = await api.get('/health', { timeout: attemptTimeoutMs });
+      if (res.status === 200) {
+        return { ok: true, attempts: attempt, elapsedMs: Date.now() - started };
+      }
+    } catch (e) {
+      /* asleep / booting / network blip — keep polling */
+    }
+    const elapsedMs = Date.now() - started;
+    if (elapsedMs >= budgetMs) {
+      return { ok: false, attempts: attempt, elapsedMs };
+    }
+    if (onTick) {
+      try {
+        onTick({ attempt, elapsedMs });
+      } catch {
+        /* ignore listener errors */
+      }
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+};
+
 // Get rate limit status
 export const getRateLimitStatus = async () => {
   try {

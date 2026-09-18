@@ -75,6 +75,18 @@
   animation: groqPulse 1.2s ease-in-out infinite;
 }
 
+.groq-waking {
+  color: var(--neu-text);
+  border-color: rgba(244, 63, 94, 0.45);
+  background: linear-gradient(145deg, #2a1218, var(--neu-surface));
+}
+
+.groq-waking .groq-dot {
+  background: var(--neu-accent);
+  animation: groqPulse 1.2s ease-in-out infinite;
+  box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.18), 0 0 12px var(--neu-accent-glow);
+}
+
 .groq-connected {
   color: var(--neu-text);
   border-color: rgba(244, 63, 94, 0.45);

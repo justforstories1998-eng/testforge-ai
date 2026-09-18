@@ -4,8 +4,7 @@ AI-powered test case generator. Paste acceptance criteria, get enterprise-grade 
 
 ## Features
 
-- **AI generation** — Groq-powered test scenarios with step-by-step actions and expected results; generation is gated behind a live connection check
-- **Playwright export** — runnable `.spec.ts` output with resilient locators, per-line `WHY` explanations, and an in-app preview/edit modal before download
+- **AI generation** — Groq-powered test scenarios with step-by-step actions and expected results; generation is gated behind a live connection check, and Retry wakes a sleeping free-tier host before re-checking- **Playwright export** — runnable `.spec.ts` output with resilient locators, per-line `WHY` explanations, and an in-app preview/edit modal before download
 - **More exports** — CSV, JSON, Markdown
 - **Repository** — searchable history of all generations, per-row delete, clear-all
 - **Insights** — scenario-type and priority distribution dashboard

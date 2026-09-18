@@ -25,7 +25,7 @@ import Statistics from './components/Statistics';
 import LoadingOverlay from './components/LoadingOverlay';
 import PlaywrightExportModal from './components/PlaywrightExportModal';
 import LandingPage from './components/LandingPage';
-import { getGroqStatus } from './services/api';
+import { getGroqStatus, wakeBackend } from './services/api';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -114,6 +114,29 @@ const fetchAll = useCallback(async () => {
     return status;
   }, []);
 
+  // Retry with host wake-up: free-tier backends (Render) sleep when idle
+  // and need up to ~a minute to boot. Wake first, then run the fresh check.
+  const retryGroqConnection = useCallback(async () => {
+    setGroq({ state: 'waking', attempts: 0, elapsedMs: 0 });
+    const wake = await wakeBackend({
+      onTick: ({ attempt, elapsedMs }) =>
+        setGroq({ state: 'waking', attempts: attempt, elapsedMs }),
+    });
+    if (!wake.ok) {
+      const message = `Backend did not respond within ${Math.round(wake.elapsedMs / 1000)}s. It may still be starting — wait a moment and retry.`;
+      setGroq({
+        state: 'disconnected',
+        model: null,
+        message,
+        rateLimited: false,
+        latencyMs: null,
+        checkedAt: null,
+      });
+      return { connected: false, message };
+    }
+    return checkGroq(true);
+  }, [checkGroq]);
+
   useEffect(() => {
     checkGroq(false);
     const t = setInterval(() => checkGroq(false), 60000);
@@ -136,9 +159,9 @@ const fetchAll = useCallback(async () => {
   // Handle test case generation (allowed only when Groq AI is connected)
   const handleGenerate = async (formData) => {
     // Re-check live before spending a generation call, unless we already
-    // know we're connected.
+    // know we're connected. Wakes a sleeping host first.
     if (groq.state !== 'connected') {
-      const status = await checkGroq(true);
+      const status = await retryGroqConnection();
       if (!status?.connected) {
         const msg = status?.message || 'Groq AI is not connected. Generation is disabled until the connection is restored.';
         setError(msg);
@@ -333,7 +356,7 @@ const fetchAll = useCallback(async () => {
                 onGenerate={handleGenerate}
                 loading={loading}
                 groqStatus={groq}
-                onRetryGroq={() => checkGroq(true)}
+                onRetryGroq={retryGroqConnection}
               />
 
               {testCases.length > 0 && (

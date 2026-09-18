@@ -18,6 +18,12 @@ function GroqStatus({ status, onRetry }) {
       title: 'Checking AI connection…',
       detail: 'Pinging the Groq backend.',
     },
+    waking: {
+      className: 'groq-waking',
+      icon: <FaSpinner className="groq-spin" />,
+      title: 'Waking up the server…',
+      detail: `Render sleeps when idle — attempt ${status?.attempts || 1} · ${Math.round((status?.elapsedMs || 0) / 1000)}s elapsed. This can take up to a minute, hang tight.`,
+    },
     connected: {
       className: 'groq-connected',
       icon: <FaCheckCircle />,
@@ -48,7 +54,7 @@ function GroqStatus({ status, onRetry }) {
           type="button"
           className="groq-retry"
           onClick={onRetry}
-          disabled={state === 'checking'}
+          disabled={state === 'checking' || state === 'waking'}
           title="Re-check the AI connection"
         >
           <FaSyncAlt className={state === 'checking' ? 'groq-spin' : ''} /> Retry
