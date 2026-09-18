@@ -1,4 +1,5 @@
 import React from 'react';
+import Logo from './Logo';
 import './LandingPage.css';
 
 const HERO_VIDEO_URL = 'https://designerstephen.github.io/public-assets/videos/serene-art-hero.mp4';
@@ -22,7 +23,8 @@ function LandingPage({ onNavigate }) {
       {/* Three-column distributed nav */}
       <nav className="landing-nav">
         <div className="landing-brand">
-          Test-CaseAI<sup>®</sup>
+          <Logo size={34} />
+          <span>Test-CaseAI<sup>®</sup></span>
         </div>
         <div className="landing-links">
           <button type="button" onClick={() => onNavigate('generate')}>

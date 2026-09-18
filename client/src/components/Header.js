@@ -1,5 +1,6 @@
 import React from 'react';
-import { FaTerminal, FaPlus, FaHistory, FaChartBar } from 'react-icons/fa';
+import { FaPlus, FaHistory, FaChartBar } from 'react-icons/fa';
+import Logo from './Logo';
 import './Header.css';
 
 const Header = ({ currentPage, onPageChange, historyCount, onBrandClick }) => {
@@ -7,7 +8,7 @@ const Header = ({ currentPage, onPageChange, historyCount, onBrandClick }) => {
     <header className="app-header">
       <div className="container header-inner">
         <button className="brand brand-home" onClick={onBrandClick} title="Back to home">
-          <FaTerminal className="brand-icon" />
+          <Logo size={30} />
           <span>Test-Case<span className="accent">AI</span></span>
         </button>
         <nav className="nav-menu">

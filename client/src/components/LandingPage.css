@@ -63,6 +63,9 @@
 }
 
 .landing-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   font-family: 'Instrument Serif', serif;
   font-weight: 400;
   font-size: 30px;
