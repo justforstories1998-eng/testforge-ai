@@ -8,7 +8,7 @@ module.exports = function handler(req, res) {
   if (req.method === 'GET') {
     return res.status(200).json({
       success: true,
-      supportedFormats: ['csv', 'json', 'markdown']
+      supportedFormats: ['csv', 'json', 'markdown', 'playwright']
     });
   }
 

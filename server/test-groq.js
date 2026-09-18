@@ -21,6 +21,7 @@ async function testGroqAPI() {
 
   try {
     console.log('\n📤 Sending test request to Groq...');
+    console.log('🤖 Model:', process.env.GROQ_MODEL || 'openai/gpt-oss-120b');
     
     const completion = await groq.chat.completions.create({
       messages: [
@@ -33,7 +34,7 @@ async function testGroqAPI() {
           content: 'Return exactly this JSON: ["test", "success"]'
         }
       ],
-      model: 'llama-3.3-70b-versatile',
+      model: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
       temperature: 0.5,
       max_tokens: 100
     });

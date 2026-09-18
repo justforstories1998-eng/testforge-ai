@@ -1,6 +1,11 @@
 const Groq = require('groq-sdk');
 const rateLimiter = require('./rateLimiter');
 
+// NOTE: `llama-3.3-70b-versatile` was shut down by Groq on 2026-08-16.
+// Groq's recommended production replacement is `openai/gpt-oss-120b`.
+// Override per-environment with the GROQ_MODEL env var.
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
@@ -10,7 +15,7 @@ async function makeGroqRequest(messages, options = {}) {
   rateLimiter.checkLimit();
   
   const {
-    model = 'llama-3.3-70b-versatile',
+    model = GROQ_MODEL,
     temperature = 0.5,
     maxTokens = 2000
   } = options;
@@ -985,8 +990,104 @@ function getRateLimitStatus() {
   return rateLimiter.getStatus();
 }
 
+// ═══════════════════════════════════════════════════════════
+// GROQ CONNECTION CHECK
+// Lightweight ping used by the UI to decide whether generation
+// is allowed. Results are cached briefly so status polling and
+// the pre-generate guard don't burn API quota.
+// ═══════════════════════════════════════════════════════════
+
+const GROQ_STATUS_CACHE_MS = 30000;
+let groqStatusCache = { checkedAt: 0, result: null };
+
+async function checkGroqConnection(options = {}) {
+  const { force = false } = options;
+  const now = Date.now();
+
+  if (!force && groqStatusCache.result && now - groqStatusCache.checkedAt < GROQ_STATUS_CACHE_MS) {
+    return groqStatusCache.result;
+  }
+
+  if (!process.env.GROQ_API_KEY) {
+    return cacheAndReturn({
+      connected: false,
+      reason: 'missing_key',
+      message: 'GROQ_API_KEY is not configured on the server.',
+      model: null,
+      latencyMs: 0,
+      rateLimited: false,
+      checkedAt: new Date().toISOString(),
+    });
+  }
+
+  // If our own limiter is exhausted we know the key exists and the
+  // service was reachable — report connected but rate-limited
+  // without spending another API call.
+  try {
+    rateLimiter.checkLimit();
+    // Undo the increment above: a status check must not consume quota.
+    rateLimiter.minuteRequests = Math.max(0, rateLimiter.minuteRequests - 1);
+    rateLimiter.dayRequests = Math.max(0, rateLimiter.dayRequests - 1);
+  } catch (limitError) {
+    return cacheAndReturn({
+      connected: true,
+      reason: 'rate_limited',
+      message: limitError.message,
+      model: GROQ_MODEL,
+      latencyMs: 0,
+      rateLimited: true,
+      checkedAt: new Date().toISOString(),
+    });
+  }
+
+  const started = Date.now();
+  try {
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Groq ping timed out after 10s')), 10000)
+    );
+    const ping = groq.chat.completions.create({
+      messages: [{ role: 'user', content: 'Reply with the single word: ok' }],
+      model: GROQ_MODEL,
+      temperature: 0,
+      max_tokens: 5,
+    });
+    const response = await Promise.race([ping, timeout]);
+    return cacheAndReturn({
+      connected: true,
+      reason: 'ok',
+      message: 'Groq AI is connected and responding.',
+      model: response?.model || GROQ_MODEL,
+      latencyMs: Date.now() - started,
+      rateLimited: false,
+      checkedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    const msg = error?.message || 'Unknown error';
+    const isRateLimit = /rate limit|429|rate_limit/i.test(msg);
+    const isBadModel = /model_not_found|does not exist|model.+not.+found|404/i.test(msg);
+    const friendly = isBadModel
+      ? `Groq rejected the model "${GROQ_MODEL}" (retired or no access). Set a valid GROQ_MODEL env var — see https://console.groq.com/docs/models. Details: ${msg}`
+      : `Groq AI is unreachable: ${msg}`;
+    return cacheAndReturn({
+      connected: isRateLimit, // key works, quota exhausted — generation fallbacks can still run
+      reason: isRateLimit ? 'rate_limited' : 'unreachable',
+      message: isRateLimit ? msg : friendly,
+      model: null,
+      latencyMs: Date.now() - started,
+      rateLimited: isRateLimit,
+      checkedAt: new Date().toISOString(),
+    });
+  }
+}
+
+function cacheAndReturn(result) {
+  groqStatusCache = { checkedAt: Date.now(), result };
+  return result;
+}
+
 module.exports = { 
   generateTestCasesWithGroq,
   generateComprehensiveTestCases,
-  getRateLimitStatus
+  getRateLimitStatus,
+  checkGroqConnection
 };

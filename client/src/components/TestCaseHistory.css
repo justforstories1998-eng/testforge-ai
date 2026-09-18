@@ -12,7 +12,7 @@
   align-items: center;
   margin-bottom: 2.5rem;
   padding-bottom: 1.5rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--neu-accent-border);
 }
 
 .repo-header-left {
@@ -24,9 +24,11 @@
 .repo-icon-bg {
   width: 48px;
   height: 48px;
-  background: #f1f5f9;
-  color: #be123c;
-  border-radius: 12px;
+  background: var(--neu-inset);
+  border: 1px solid var(--neu-accent-border);
+  box-shadow: var(--neu-in);
+  color: var(--neu-accent);
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -36,64 +38,72 @@
 .repo-header-text h2 {
   margin: 0;
   font-size: 1.75rem;
-  color: #0f172a;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: var(--neu-text);
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
 .repo-header-text p {
   margin: 0.2rem 0 0;
-  color: #64748b;
+  color: var(--neu-muted);
   font-size: 0.95rem;
 }
 
 .repo-clear-btn {
-  background: white;
-  border: 1px solid #e2e8f0;
-  color: #64748b;
+  background: var(--neu-surface);
+  border: 1px solid var(--neu-accent-border);
+  box-shadow: var(--neu-ex-sm);
+  color: var(--neu-muted);
   padding: 0.6rem 1.25rem;
-  border-radius: 8px;
-  font-weight: 600;
+  border-radius: 16px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
   font-size: 0.85rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s var(--neu-ease);
 }
 
 .repo-clear-btn:hover {
-  background: #fff1f2;
-  color: #be123c;
-  border-color: #fecaca;
+  color: var(--neu-accent);
+  border-color: var(--neu-accent);
 }
 
-/* Export Card */
+.repo-clear-btn:active {
+  box-shadow: var(--neu-in-sm);
+  transform: translateY(2px);
+}
+
+/* Export Card — extruded */
 .repo-export-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
+  background: var(--neu-surface);
+  border: 1px solid var(--neu-accent-border);
+  border-radius: var(--radius-lg);
   padding: 3rem;
   margin-bottom: 3rem;
   text-align: center;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--neu-ex);
 }
 
 .repo-export-header {
   margin-bottom: 2rem;
-  color: #0f172a;
+  color: var(--neu-text);
 }
 
 .repo-export-icon {
   font-size: 2rem;
-  color: #be123c;
+  color: var(--neu-accent);
   margin-bottom: 1rem;
 }
 
 .repo-export-header h3 {
   margin: 0;
   font-size: 1.5rem;
-  font-weight: 700;
+  font-weight: 800;
+  font-family: 'Plus Jakarta Sans', sans-serif;
 }
 
 .repo-export-actions {
@@ -103,39 +113,56 @@
   flex-wrap: wrap;
 }
 
-/* Fix for the "Broken Buttons" in your screenshot */
 .repo-btn-secondary {
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  color: #334155;
+  background: var(--neu-surface);
+  border: 1px solid var(--neu-accent-border);
+  box-shadow: var(--neu-ex-sm);
+  color: var(--neu-text);
   padding: 0.75rem 1.5rem;
-  border-radius: 8px;
+  border-radius: 16px;
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
   display: flex;
   align-items: center;
   gap: 0.6rem;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s var(--neu-ease);
 }
 
 .repo-btn-secondary:hover {
-  border-color: #be123c;
-  color: #be123c;
-  background-color: #fff1f2;
+  border-color: var(--neu-accent);
+  color: var(--neu-accent);
+  box-shadow: var(--neu-ex-sm), 0 0 16px rgba(244, 63, 94, 0.25);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(190, 18, 60, 0.1);
+}
+
+.repo-btn-secondary:active {
+  box-shadow: var(--neu-in-sm);
+  transform: translateY(2px);
 }
 
 .repo-btn-secondary svg {
   font-size: 1.1rem;
 }
 
-.icon-csv { color: #059669; }
-.icon-json { color: #0284c7; }
-.icon-md { color: #4b5563; }
+.icon-csv { color: var(--neu-rose); }
+.icon-json { color: var(--neu-accent); }
+.icon-md { color: var(--neu-muted); }
+.icon-pw { color: var(--neu-accent); }
 
-/* Search Area */
+.repo-btn-playwright {
+  border-color: var(--neu-accent);
+  background: linear-gradient(145deg, #2b1219, var(--neu-surface));
+  color: #fff;
+}
+
+.repo-btn-playwright:active {
+  box-shadow: var(--neu-in-sm);
+  transform: translateY(2px);
+}
+
+/* Search Area — inset bar with icon */
 .repo-search-area {
   margin-bottom: 2rem;
 }
@@ -150,39 +177,61 @@
   left: 1rem;
   top: 50%;
   transform: translateY(-50%);
-  color: #94a3b8;
+  color: var(--neu-accent);
 }
 
 .repo-search-input-wrapper input {
   width: 100%;
   padding: 0.85rem 1rem 0.85rem 2.75rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border: 1px solid var(--neu-accent-border);
+  background: var(--neu-inset);
+  box-shadow: var(--neu-in);
+  border-radius: 16px;
   font-size: 1rem;
-  background: white;
-  transition: all 0.2s;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--neu-text);
+  transition: all 0.2s var(--neu-ease);
   outline: none;
 }
 
-.repo-search-input-wrapper input:focus {
-  border-color: #be123c;
-  box-shadow: 0 0 0 3px rgba(190, 18, 60, 0.1);
+.repo-search-input-wrapper input::placeholder {
+  color: var(--neu-faint);
 }
 
-/* Empty State */
+.repo-search-input-wrapper input:focus {
+  border-color: var(--neu-accent);
+  box-shadow: var(--neu-in-sm), 0 0 0 3px rgba(244, 63, 94, 0.18);
+}
+
+.repo-list-wrapper {
+  margin-top: 0;
+}
+
+.repo-list-wrapper .list-container {
+  margin-top: 0;
+}
+
+/* Empty State — dashed inset zone */
 .repo-empty-state {
   text-align: center;
   padding: 5rem 2rem;
-  background: white;
-  border-radius: 16px;
-  border: 2px dashed #e2e8f0;
-  color: #94a3b8;
+  background: var(--neu-inset);
+  border-radius: var(--radius-lg);
+  border: 2px dashed rgba(244, 63, 94, 0.25);
+  box-shadow: var(--neu-in-sm);
+  color: var(--neu-faint);
 }
 
 .repo-empty-state svg {
   font-size: 3.5rem;
   margin-bottom: 1.5rem;
-  opacity: 0.3;
+  opacity: 0.4;
+  color: var(--neu-accent);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @media (max-width: 768px) {

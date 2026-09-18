@@ -7,6 +7,7 @@ import {
   FaFileCode, 
   FaMarkdown, 
   FaFileExport,
+  FaFlask,
   FaInbox
 } from 'react-icons/fa';
 import './TestCaseHistory.css';
@@ -63,6 +64,9 @@ function TestCaseHistory({ testCases, onDelete, onClearAll, onExport }) {
             </button>
             <button className="repo-btn-secondary" onClick={() => onExport('markdown', safeTestCases)}>
               <FaMarkdown className="icon-md" /> Export Markdown
+            </button>
+            <button className="repo-btn-secondary repo-btn-playwright" onClick={() => onExport('playwright', safeTestCases)}>
+              <FaFlask className="icon-pw" /> Export Playwright .spec.ts
             </button>
           </div>
         </div>

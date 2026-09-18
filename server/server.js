@@ -63,7 +63,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'Healthy',
     timestamp: new Date().toISOString(),
-    engine: 'Groq Llama-3.3',
+    engine: 'Groq',
     apiKeyStatus: process.env.GROQ_API_KEY ? 'Active' : 'Missing'
   });
 });
@@ -71,7 +71,7 @@ app.get('/api/health', (req, res) => {
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
-    name: 'TestForge AI API',
+    name: 'Test-CaseAI API',
     version: '1.0.0',
     status: 'Operational'
   });
@@ -99,7 +99,7 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log('-----------------------------------------------------------');
-  console.log(`System: TestForge AI Backend Protocol`);
+  console.log(`System: Test-CaseAI Backend Protocol`);
   console.log(`Status: Operational on Port ${PORT}`);
   console.log(`CORS: Allowed for ${allowedOrigins.join(', ')}`);
   console.log(`AI Configuration: ${process.env.GROQ_API_KEY ? 'Validated' : 'Action Required'}`);

@@ -1,10 +1,14 @@
 .stats-container {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
+    background: var(--neu-surface);
+    border: 1px solid var(--neu-accent-border);
+    border-radius: var(--radius-lg);
     padding: 2rem;
     margin-top: 2rem;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--neu-ex);
+}
+
+.stats-container.full-page {
+    margin-top: 0;
 }
 
 .stats-header-main {
@@ -12,57 +16,79 @@
     align-items: center;
     gap: 0.75rem;
     margin-bottom: 2rem;
-    color: #1e293b;
-    border-bottom: 2px solid #f1f5f9;
+    color: var(--neu-text);
+    border-bottom: 1px solid var(--neu-accent-border);
     padding-bottom: 1rem;
 }
 
+.stats-header-main h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 800;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    letter-spacing: -0.01em;
+}
+
 .header-icon {
-    color: #be123c;
+    color: var(--neu-accent);
     font-size: 1.5rem;
 }
 
+/* Bento grid — three columns of extruded cards */
 .stats-summary-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(3, 1fr);
     gap: 1.5rem;
     margin-bottom: 2.5rem;
 }
 
 .metric-card {
-    background: #f8fafc;
-    border: 1px solid #f1f5f9;
+    background: var(--neu-surface);
+    border: 1px solid var(--neu-accent-border);
     padding: 1.5rem;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--neu-ex);
     display: flex;
     align-items: center;
     gap: 1.25rem;
+    transition: all 0.2s var(--neu-ease);
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--neu-ex), 0 0 18px rgba(244, 63, 94, 0.2);
 }
 
 .metric-icon {
     width: 48px;
     height: 48px;
-    background: #be123c;
-    color: white;
-    border-radius: 8px;
+    background: var(--neu-inset);
+    border: 1px solid var(--neu-accent-border);
+    box-shadow: var(--neu-in);
+    color: var(--neu-accent);
+    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 1.25rem;
+    flex-shrink: 0;
 }
 
 .metric-label {
     display: block;
-    font-size: 0.875rem;
-    color: #64748b;
-    font-weight: 500;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--neu-muted);
 }
 
 .metric-value {
     display: block;
     font-size: 1.5rem;
-    font-weight: 700;
-    color: #0f172a;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--neu-text);
 }
 
 .stats-detail-grid {
@@ -74,8 +100,8 @@
 .detail-section h4 {
     font-size: 0.9rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #64748b;
+    letter-spacing: 0.08em;
+    color: var(--neu-muted);
     margin-bottom: 1.25rem;
 }
 
@@ -90,32 +116,40 @@
     width: 120px;
     font-size: 0.875rem;
     font-weight: 500;
-    color: #334155;
+    color: var(--neu-text);
 }
 
 .item-bar-bg {
     flex: 1;
     height: 8px;
-    background: #f1f5f9;
+    background: var(--neu-inset);
+    border: 1px solid var(--neu-accent-border);
+    box-shadow: var(--neu-in-sm);
     border-radius: 4px;
     overflow: hidden;
 }
 
 .item-bar-fill {
     height: 100%;
-    background: #be123c;
+    background: linear-gradient(90deg, var(--neu-accent-deep), var(--neu-accent));
+    box-shadow: 0 0 10px rgba(244, 63, 94, 0.5);
 }
 
 .priority-fill {
-    background: #475569;
+    background: linear-gradient(90deg, #7f1d2d, var(--neu-rose));
 }
 
 .item-value {
     width: 30px;
     font-size: 0.875rem;
-    font-weight: 700;
-    color: #1e293b;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--neu-rose);
     text-align: right;
+}
+
+@media (max-width: 900px) {
+    .stats-summary-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {

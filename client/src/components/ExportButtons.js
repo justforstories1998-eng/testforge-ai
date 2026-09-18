@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './ExportButtons.css';
-import { exportAsCSV, exportAsJSON, exportAsExcel } from '../services/api';
-import { FaFileExport, FaFileCsv, FaFileCode, FaFileExcel } from 'react-icons/fa';
+import { exportAsCSV, exportAsJSON, exportAsExcel, exportAsPlaywright } from '../services/api';
+import { FaFileExport, FaFileCsv, FaFileCode, FaFileExcel, FaFlask } from 'react-icons/fa';
 
 const ExportButtons = ({ testCases }) => {
   const [exporting, setExporting] = useState(null);
@@ -26,6 +26,9 @@ const ExportButtons = ({ testCases }) => {
           break;
         case 'excel':
           await exportAsExcel(testCaseIds);
+          break;
+        case 'playwright':
+          await exportAsPlaywright(testCaseIds);
           break;
         default:
           break;
@@ -82,6 +85,16 @@ const ExportButtons = ({ testCases }) => {
           <FaFileExcel />
           <span>Export for Excel</span>
           {exporting === 'excel' && <div className="btn-loader"></div>}
+        </button>
+
+        <button
+          className="export-btn playwright-btn"
+          onClick={() => handleExport('playwright')}
+          disabled={exporting !== null}
+        >
+          <FaFlask />
+          <span>Export Playwright .spec.ts</span>
+          {exporting === 'playwright' && <div className="btn-loader"></div>}
         </button>
       </div>
     </div>

@@ -8,11 +8,15 @@ const {
   deleteTestCase,
   getStatistics,
   deleteAllTestCases,
-  getRateLimitStatus
+  getRateLimitStatus,
+  getGroqStatus
 } = require('../controllers/testCaseController');
 
 // Generate test cases with AI
 router.post('/generate', generateTestCases);
+
+// Groq AI connection status — MUST be before /:id route
+router.get('/groq-status', getGroqStatus);
 
 // Get rate limit status
 router.get('/rate-limit', getRateLimitStatus);

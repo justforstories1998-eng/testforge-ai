@@ -2,14 +2,14 @@ import React from 'react';
 import { FaTerminal, FaPlus, FaHistory, FaChartBar } from 'react-icons/fa';
 import './Header.css';
 
-const Header = ({ currentPage, onPageChange, historyCount }) => {
+const Header = ({ currentPage, onPageChange, historyCount, onBrandClick }) => {
   return (
     <header className="app-header">
       <div className="container header-inner">
-        <div className="brand">
+        <button className="brand brand-home" onClick={onBrandClick} title="Back to home">
           <FaTerminal className="brand-icon" />
-          <span>TestForge<span className="accent">AI</span></span>
-        </div>
+          <span>Test-Case<span className="accent">AI</span></span>
+        </button>
         <nav className="nav-menu">
           <button 
             className={`nav-item ${currentPage === 'generate' ? 'active' : ''}`}

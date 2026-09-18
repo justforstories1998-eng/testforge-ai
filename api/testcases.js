@@ -14,6 +14,11 @@ let rateLimiter = {
   MAX_PER_DAY: 14000
 };
 
+// NOTE: `llama-3.3-70b-versatile` was shut down by Groq on 2026-08-16.
+// Groq's recommended production replacement is `openai/gpt-oss-120b`.
+// Override per-environment with the GROQ_MODEL env var.
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+
 // Initialize Groq client
 let groq = null;
 const getGroqClient = () => {
@@ -59,13 +64,16 @@ module.exports = async function handler(req, res) {
     if (subPath === 'rate-limit' && method === 'GET') {
       return handleRateLimit(req, res);
     }
+    if (subPath === 'groq-status' && method === 'GET') {
+      return await handleGroqStatus(req, res);
+    }
     if (subPath === '' && method === 'GET') {
       return handleGetAll(req, res);
     }
     if (subPath === '' && method === 'DELETE') {
       return handleDeleteAll(req, res);
     }
-    if (subPath && !['generate', 'statistics', 'rate-limit'].includes(subPath) && method === 'GET') {
+    if (subPath && !['generate', 'statistics', 'rate-limit', 'groq-status'].includes(subPath) && method === 'GET') {
       return handleGetById(req, res, subPath);
     }
     if (subPath && method === 'PUT') {
@@ -106,7 +114,10 @@ async function handleGenerate(req, res) {
     }
 
     if (!process.env.GROQ_API_KEY) {
-      return res.status(500).json({ error: 'GROQ_API_KEY not configured' });
+      return res.status(503).json({
+        error: 'Groq AI is not connected (API key missing). Generation is disabled.',
+        isConnectionError: true
+      });
     }
 
     const rateLimitCheck = checkRateLimit();
@@ -191,6 +202,63 @@ function handleRateLimit(req, res) {
   });
 }
 
+async function handleGroqStatus(req, res) {
+  if (!process.env.GROQ_API_KEY) {
+    return res.status(200).json({
+      success: true,
+      connected: false,
+      reason: 'missing_key',
+      message: 'GROQ_API_KEY is not configured on the server.',
+      model: null,
+      latencyMs: 0,
+      rateLimited: false,
+      checkedAt: new Date().toISOString()
+    });
+  }
+
+  const started = Date.now();
+  try {
+    const client = getGroqClient();
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Groq ping timed out after 10s')), 10000)
+    );
+    const ping = client.chat.completions.create({
+      messages: [{ role: 'user', content: 'Reply with the single word: ok' }],
+      model: GROQ_MODEL,
+      temperature: 0,
+      max_tokens: 5
+    });
+    const response = await Promise.race([ping, timeout]);
+    return res.status(200).json({
+      success: true,
+      connected: true,
+      reason: 'ok',
+      message: 'Groq AI is connected and responding.',
+      model: response?.model || GROQ_MODEL,
+      latencyMs: Date.now() - started,
+      rateLimited: false,
+      checkedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    const msg = error?.message || 'Unknown error';
+    const isRateLimit = /rate limit|429|rate_limit/i.test(msg);
+    const isBadModel = /model_not_found|does not exist|model.+not.+found|404/i.test(msg);
+    const friendly = isBadModel
+      ? `Groq rejected the model "${GROQ_MODEL}" (retired or no access). Set a valid GROQ_MODEL env var — see https://console.groq.com/docs/models. Details: ${msg}`
+      : `Groq AI is unreachable: ${msg}`;
+    return res.status(200).json({
+      success: true,
+      connected: isRateLimit,
+      reason: isRateLimit ? 'rate_limited' : 'unreachable',
+      message: isRateLimit ? msg : friendly,
+      model: null,
+      latencyMs: Date.now() - started,
+      rateLimited: isRateLimit,
+      checkedAt: new Date().toISOString()
+    });
+  }
+}
+
 function handleGetById(req, res, id) {
   const testCase = testCases.find(tc => tc._id === id);
   if (!testCase) return res.status(404).json({ error: 'Test case not found' });
@@ -253,7 +321,7 @@ Each with ${numberOfSteps} steps. Title starts with "Verify". Return ONLY JSON a
         { role: 'system', content: 'Output ONLY valid JSON arrays. No markdown.' },
         { role: 'user', content: prompt }
       ],
-      model: 'llama-3.3-70b-versatile',
+      model: GROQ_MODEL,
       temperature: 0.5,
       max_tokens: 4000
     });
@@ -281,7 +349,7 @@ Each with scenarioType field, 4-6 steps. Return ONLY JSON:
         { role: 'system', content: 'Output ONLY valid JSON arrays.' },
         { role: 'user', content: prompt }
       ],
-      model: 'llama-3.3-70b-versatile',
+      model: GROQ_MODEL,
       temperature: 0.4,
       max_tokens: 6000
     });

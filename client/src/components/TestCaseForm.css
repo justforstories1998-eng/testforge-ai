@@ -5,14 +5,14 @@
   justify-content: center;
 }
 
-/* Main Card Wrapper */
+/* Main Card Wrapper — extruded bento card */
 .tc-form-card {
-  background: #ffffff;
+  background: var(--neu-surface);
   width: 100%;
   max-width: 850px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--neu-accent-border);
+  box-shadow: var(--neu-ex);
   padding: 2.5rem;
 }
 
@@ -23,24 +23,51 @@
   gap: 1.25rem;
   margin-bottom: 2.5rem;
   padding-bottom: 1.5rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--neu-accent-border);
 }
 
 .tc-header-icon {
-  font-size: 2.5rem;
-  color: #be123c; /* Crimson */
+  font-size: 2rem;
+  color: var(--neu-accent);
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--neu-inset);
+  border: 1px solid var(--neu-accent-border);
+  border-radius: 16px;
+  box-shadow: var(--neu-in);
+  flex-shrink: 0;
 }
 
 .tc-header-text h2 {
   margin: 0;
   font-size: 1.6rem;
-  color: #0f172a; /* Slate 900 */
-  font-weight: 700;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: var(--neu-text);
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .tc-header-text p {
   margin: 0.2rem 0 0;
-  color: #64748b; /* Slate 500 */
+  color: var(--neu-muted);
+}
+
+/* Error banner */
+.tc-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: linear-gradient(145deg, #2a1218, var(--neu-surface));
+  border: 1px solid rgba(244, 63, 94, 0.45);
+  color: #fecdd3;
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1.1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 /* Form Layout */
@@ -67,111 +94,176 @@
   grid-column: span 2;
 }
 
+/* Technical labels: uppercase, 10px, tracking-widest */
 .tc-label {
   display: flex;
   align-items: center;
-  font-size: 0.85rem;
+  font-size: 10px;
   font-weight: 700;
-  color: #334155; /* Slate 700 */
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--neu-muted);
 }
 
 .tc-label-icon {
-  color: #be123c;
+  color: var(--neu-accent);
   margin-right: 0.6rem;
   font-size: 0.9rem;
 }
 
-/* Inputs, Textarea, and Selects */
+/* Inputs, Textarea, and Selects — inset rectangles */
 .tc-main-form input[type="text"],
 .tc-main-form input[type="number"],
 .tc-main-form select,
 .tc-main-form textarea {
-  width: 100%; /* Forces inputs to fill their container */
-  box-sizing: border-box; /* Prevents padding from breaking width */
+  width: 100%;
+  box-sizing: border-box;
   padding: 0.75rem 1rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background-color: #f8fafc;
-  font-family: inherit;
+  border: 1px solid var(--neu-accent-border);
+  border-radius: 16px;
+  background-color: var(--neu-inset);
+  box-shadow: var(--neu-in-sm);
+  font-family: 'DM Sans', sans-serif;
   font-size: 0.95rem;
-  color: #1e293b;
-  transition: all 0.2s ease;
+  color: var(--neu-text);
+  transition: all 0.2s var(--neu-ease);
 }
 
 .tc-main-form textarea {
   resize: vertical;
   min-height: 100px;
+  line-height: 1.6;
+}
+
+.tc-main-form select {
+  appearance: none;
+  cursor: pointer;
 }
 
 /* Focus States */
-.tc-main-form input:focus, 
-.tc-main-form select:focus, 
+.tc-main-form input:focus,
+.tc-main-form select:focus,
 .tc-main-form textarea:focus {
   outline: none;
-  border-color: #be123c;
-  background-color: #ffffff;
-  box-shadow: 0 0 0 3px rgba(190, 18, 60, 0.1);
+  border-color: var(--neu-accent);
+  box-shadow: var(--neu-in-sm), 0 0 0 3px rgba(244, 63, 94, 0.18);
 }
 
 /* Disabled State for Comprehensive Mode */
 .tc-main-form input:disabled {
-  background-color: #f1f5f9;
-  border-color: #e2e8f0;
-  color: #94a3b8;
+  background-color: var(--neu-inset);
+  border-color: var(--neu-accent-border);
+  color: var(--neu-faint);
   cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .tc-main-form input:disabled::placeholder {
-  color: #be123c;
+  color: var(--neu-accent);
   font-weight: 700;
 }
 
-/* Checkboxes */
+.tc-main-form input::placeholder,
+.tc-main-form textarea::placeholder {
+  color: var(--neu-faint);
+}
+
+/* Number input spinners */
+.tc-main-form input[type="number"]::-webkit-inner-spin-button {
+  opacity: 0.4;
+}
+
+/* Checkboxes — inset control group */
 .tc-checkbox-group {
   display: flex;
-  gap: 1.5rem;
+  gap: 1rem;
   padding: 0.75rem 1rem;
-  background: #f8fafc;
-  border-radius: 8px;
-  border: 1px solid #f1f5f9;
+  background: var(--neu-inset);
+  border-radius: 16px;
+  border: 1px solid var(--neu-accent-border);
+  box-shadow: var(--neu-in-sm);
+  flex-wrap: wrap;
 }
 
 .tc-checkbox-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   font-size: 0.9rem;
   font-weight: 500;
+  color: var(--neu-text);
   cursor: pointer;
 }
 
-.tc-checkbox-item input {
-  accent-color: #be123c;
+/* Custom neumorphic checkbox: 24px inset, red fill + white check */
+.tc-checkbox-item input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--neu-inset);
+  border: 1px solid var(--neu-accent-border);
+  box-shadow: var(--neu-in-sm);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: all 0.2s var(--neu-ease);
+  margin: 0;
 }
 
-/* Submit Button */
+.tc-checkbox-item input[type="checkbox"]:checked {
+  background: var(--neu-accent);
+  border-color: var(--neu-accent);
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.5);
+}
+
+.tc-checkbox-item input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.tc-checkbox-item input[type="checkbox"]:active {
+  transform: translateY(2px);
+}
+
+/* Submit Button — primary extruded CTA */
 .tc-submit-btn {
-  background-color: #be123c;
-  color: white;
-  border: none;
+  background: linear-gradient(145deg, var(--neu-accent), var(--neu-accent-deep));
+  color: #fff;
+  border: 1px solid rgba(244, 63, 94, 0.5);
   padding: 1rem;
-  border-radius: 8px;
+  border-radius: 20px;
+  font-family: 'DM Sans', sans-serif;
   font-weight: 700;
   font-size: 1.05rem;
   cursor: pointer;
   margin-top: 1rem;
-  transition: all 0.2s ease;
+  box-shadow: var(--neu-ex-sm), 0 0 20px rgba(244, 63, 94, 0.3);
+  transition: all 0.2s var(--neu-ease);
 }
 
 .tc-submit-btn:hover:not(:disabled) {
-  background-color: #9f1239;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(190, 18, 60, 0.2);
+  box-shadow: var(--neu-ex-sm), 0 0 28px rgba(244, 63, 94, 0.5);
+  filter: brightness(1.08);
+}
+
+.tc-submit-btn:active:not(:disabled) {
+  box-shadow: var(--neu-in-sm);
+  transform: translateY(2px);
 }
 
 .tc-submit-btn:disabled {
-  opacity: 0.7;
+  opacity: 0.55;
   cursor: not-allowed;
+  box-shadow: var(--neu-in-sm);
 }
 
 /* Responsive */

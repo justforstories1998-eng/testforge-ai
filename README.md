@@ -1,57 +1,95 @@
-# 🧪 TestForge AI - Intelligent Test Case Generator
+# Test-CaseAI
 
-![TestForge AI](https://img.shields.io/badge/AI-Powered-blue)
-![React](https://img.shields.io/badge/React-18.x-61DAFB?logo=react)
-![Node.js](https://img.shields.io/badge/Node.js-20.x-339933?logo=node.js)
-![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb)
-![Groq](https://img.shields.io/badge/Groq-AI-orange)
+AI-powered test case generator. Paste acceptance criteria, get enterprise-grade test scenarios (positive, negative, boundary, edge) plus runnable, editable Playwright TypeScript specs.
 
-**TestForge AI** is a professional AI-powered test case generator built for Azure DevOps. Generate detailed, natural language test cases with intelligent step-by-step scenarios using Groq's Llama 3.3 70B AI model.
+## Features
 
----
+- **AI generation** — Groq-powered test scenarios with step-by-step actions and expected results; generation is gated behind a live connection check
+- **Playwright export** — runnable `.spec.ts` output with resilient locators, per-line `WHY` explanations, and an in-app preview/edit modal before download
+- **More exports** — CSV, JSON, Markdown
+- **Repository** — searchable history of all generations, per-row delete, clear-all
+- **Insights** — scenario-type and priority distribution dashboard
+- **Dark red/black neumorphic UI** with a cinematic landing page
 
-## ✨ Features
+## Tech stack
 
-- 🤖 **AI-Powered Generation** - Uses Groq AI (Llama 3.3 70B) for intelligent test case creation
-- 📝 **Azure DevOps Format** - Generates test cases in Azure DevOps compatible format
-- 🎯 **Detailed Scenarios** - Creates comprehensive test scenarios with natural language
-- 📊 **Statistics Dashboard** - Track generated test cases with visual statistics
-- 💾 **Multiple Export Formats** - Export as CSV, JSON, or Markdown
-- 🔍 **Search & Filter** - Easily find and filter test cases in history
-- 🎨 **Professional UI** - Modern dark theme with smooth animations
-- 📱 **Fully Responsive** - Works on desktop, tablet, and mobile devices
+- **Client:** React 18, Axios, react-icons
+- **Server:** Node.js 20, Express (`server/`)
+- **Production API:** Vercel serverless functions (`api/`)
+- **AI:** Groq SDK (default model `openai/gpt-oss-120b`, override via `GROQ_MODEL`)
+- **Storage:** in-memory (no database required)
 
----
+## Quick start
 
-## 🛠️ Tech Stack
-
-### **Frontend**
-- React 18
-- Axios
-- CSS3 with modern animations
-- Google Fonts (Inter, JetBrains Mono)
-
-### **Backend**
-- Node.js & Express.js
-- MongoDB with Mongoose
-- Groq AI SDK (Llama 3.3 70B)
-- CORS & dotenv
-
-### **AI Model**
-- Groq Cloud API
-- Llama 3.3 70B Versatile
-
----
-
-## 📦 Installation
-
-### **Prerequisites**
-- Node.js (v18 or higher)
-- MongoDB Atlas account (or local MongoDB)
-- Groq API Key ([Get one here](https://console.groq.com))
-
-### **1. Clone the Repository**
+**Prerequisites:** Node.js 18+ and a free Groq API key from https://console.groq.com/keys.
 
 ```bash
-git clone https://github.com/justforstories1998-eng/testforge-ai.git
-cd testforge-ai
+# 1. Install everything (root + client + server + api)
+npm run install-all
+
+# 2. Configure — copy .env.example values into .env (root)
+GROQ_API_KEY=gsk_your_key_here
+# GROQ_MODEL=openai/gpt-oss-120b   # optional override
+
+# 3. Run backend + frontend together
+npm run dev
+```
+
+- App: http://localhost:3000
+- API: http://localhost:5000/api
+
+**Verify the AI connection** (without spending generation quota):
+
+```bash
+cd server
+npm run test-groq
+```
+
+## Scripts
+
+| Command | Where | What |
+|---|---|---|
+| `npm run dev` | root | Backend + frontend concurrently |
+| `npm run build` | root | Production build of the client |
+| `npm start` | root | Start backend only (production) |
+| `npm run dev` / `npm start` | `server/` | Nodemon / node backend |
+| `npm run test-groq` | `server/` | Ping Groq with a minimal request |
+| `npm start` / `npm run build` | `client/` | CRA dev server / production build |
+
+## Project structure
+
+```
+├── client/           # React app (landing, generate, repository, insights)
+├── server/           # Express API (Groq service, routes, in-memory model)
+├── api/              # Vercel serverless mirror of the API
+├── netlify.toml      # Netlify client deploy config
+└── vercel.json       # Vercel deploy config
+```
+
+## API overview
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/testcases/generate` | Generate scenarios from acceptance criteria |
+| GET | `/api/testcases` | List all generated rows |
+| GET | `/api/testcases/groq-status` | AI connection status (`connected`, `model`, `latencyMs`) |
+| GET | `/api/testcases/statistics` | Counts by scenario type and priority |
+| DELETE | `/api/testcases` | Clear all history |
+| POST | `/api/export/playwright` | Download generated Playwright `.spec.ts` |
+| POST | `/api/export/csv` · `/json` · `/excel` | Download other formats |
+
+In production the client calls same-origin `/api` (see `client/.env.production`).
+
+## Configuration
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `GROQ_API_KEY` | Yes | — | Groq Cloud key (never committed; `.env` is gitignored) |
+| `GROQ_MODEL` | No | `openai/gpt-oss-120b` | Model for generation + status ping |
+| `PORT` | No | `5000` | Backend port |
+| `REACT_APP_API_URL` | No | `http://localhost:5000/api` | Backend URL for local dev |
+
+## Deployment
+
+- **Client:** Netlify (`netlify.toml`, SPA fallback included) or Vercel (`vercel.json`).
+- **API:** Vercel serverless functions in `api/`. Set `GROQ_API_KEY` (and optionally `GROQ_MODEL`) in the host's environment variables.

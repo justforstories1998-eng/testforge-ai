@@ -30,6 +30,64 @@ export const generateTestCases = async (data) => {
   }
 };
 
+// Download a server-generated export file (csv / json / excel / playwright)
+const downloadExportFile = async (format, testCaseIds, fallbackFilename) => {
+  const response = await api.post(`/export/${format}`, { testCaseIds }, { responseType: 'blob' });
+  const blob = new Blob([response.data]);
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fallbackFilename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+};
+
+export const exportAsCSV = (testCaseIds) =>
+  downloadExportFile('csv', testCaseIds, `test-cases-${Date.now()}.csv`);
+
+export const exportAsJSON = (testCaseIds) =>
+  downloadExportFile('json', testCaseIds, `test-cases-${Date.now()}.json`);
+
+export const exportAsExcel = (testCaseIds) =>
+  downloadExportFile('excel', testCaseIds, `test-cases-excel-${Date.now()}.csv`);
+
+export const exportAsPlaywright = (testCaseIds, options = {}) =>
+  api.post('/export/playwright', { testCaseIds, ...options }, { responseType: 'blob' }).then((response) => {
+    const blob = new Blob([response.data], { type: 'text/typescript' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `test-caseai-generated-${Date.now()}.spec.ts`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  });
+
+// Check whether the Groq AI backend is reachable.
+// Used to gate test-case generation. Short timeout so an offline
+// backend fails fast instead of hanging the UI.
+export const getGroqStatus = async (fresh = false) => {
+  try {
+    const response = await api.get(`/testcases/groq-status${fresh ? '?fresh=1' : ''}`, {
+      timeout: 15000,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Groq status check failed:', error);
+    return {
+      success: false,
+      connected: false,
+      reason: 'unreachable',
+      message: 'Backend unreachable. Is the API server running?',
+      model: null,
+      rateLimited: false,
+    };
+  }
+};
+
 // Get rate limit status
 export const getRateLimitStatus = async () => {
   try {

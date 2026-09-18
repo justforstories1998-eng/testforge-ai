@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const TestCase = require('../models/TestCase');
+const { buildPlaywrightSpec } = require('../utils/playwrightSpec');
 
 // @route   POST /api/export/csv
 // @desc    Export test cases as CSV
@@ -160,6 +161,46 @@ router.post('/excel', async (req, res) => {
     res.status(500).json({ 
       success: false,
       error: error.message 
+    });
+  }
+});
+
+// @route   POST /api/export/playwright
+// @desc    Export test cases as an editable Playwright TypeScript spec file
+// @access  Public
+router.post('/playwright', async (req, res) => {
+  try {
+    const { testCaseIds, baseURL = '/', describeTitle = 'Test-CaseAI — Generated Suite' } = req.body || {};
+
+    console.log('📥 Exporting as Playwright spec...');
+
+    const allTestCases = await TestCase.find().sort({ createdAt: -1 });
+
+    let testCases = allTestCases;
+    if (testCaseIds && Array.isArray(testCaseIds) && testCaseIds.length > 0) {
+      testCases = allTestCases.filter(tc => testCaseIds.includes(tc._id || tc.id));
+    }
+
+    if (testCases.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'No test cases found'
+      });
+    }
+
+    const spec = buildPlaywrightSpec(testCases, { baseURL, describeTitle });
+    const filename = `test-caseai-generated-${Date.now()}.spec.ts`;
+
+    console.log(`✅ Playwright export completed: ${testCases.length} rows`);
+
+    res.setHeader('Content-Type', 'text/typescript; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+    res.send(spec);
+  } catch (error) {
+    console.error('❌ Error exporting Playwright spec:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });

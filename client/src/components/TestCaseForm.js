@@ -13,8 +13,11 @@ import {
   FaFlask 
 } from 'react-icons/fa';
 import './TestCaseForm.css';
+import GroqStatus from './GroqStatus';
 
-function TestCaseForm({ onGenerate, loading }) {
+function TestCaseForm({ onGenerate, loading, groqStatus, onRetryGroq }) {
+  const aiReady = groqStatus?.state === 'connected';
+  const aiChecking = !groqStatus || groqStatus.state === 'checking';
   const [formData, setFormData] = useState({
     acceptanceCriteria: '',
     scenarioType: 'Positive',
@@ -51,6 +54,10 @@ function TestCaseForm({ onGenerate, loading }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!aiReady) {
+      setError('Groq AI is not connected. Please restore the connection before generating.');
+      return;
+    }
     if (formData.acceptanceCriteria.trim().length < 10) {
       setError('Detailed acceptance criteria is required for high-quality AI analysis.');
       return;
@@ -83,6 +90,9 @@ function TestCaseForm({ onGenerate, loading }) {
             <FaExclamationCircle /> {error}
           </div>
         )}
+
+        {/* Groq AI connection — generation is allowed only when connected */}
+        <GroqStatus status={groqStatus} onRetry={onRetryGroq} />
 
         <form className="tc-main-form" onSubmit={handleSubmit}>
           
@@ -234,8 +244,14 @@ function TestCaseForm({ onGenerate, loading }) {
             </div>
           </div>
 
-          <button className="tc-submit-btn" type="submit" disabled={loading}>
-            {loading ? 'AI Modeling Criteria...' : 'Generate Scenarios'}
+          <button className="tc-submit-btn" type="submit" disabled={loading || !aiReady}>
+            {loading
+              ? 'AI Modeling Criteria...'
+              : aiChecking
+                ? 'Checking AI Connection...'
+                : aiReady
+                  ? 'Generate Scenarios'
+                  : 'AI Offline — Generation Disabled'}
           </button>
         </form>
       </div>

@@ -8,6 +8,7 @@ import {
   FaFileCode, 
   FaMarkdown, 
   FaTimes,
+  FaFlask,
   FaMicrochip, // Changed from FaCpu to FaMicrochip
   FaTerminal,
   FaGithub
@@ -20,26 +21,24 @@ import TestCaseForm from './components/TestCaseForm';
 import TestCaseList from './components/TestCaseList';
 import TestCaseHistory from './components/TestCaseHistory';
 import Statistics from './components/Statistics';
-import SplashScreen from './components/SplashScreen';
 import LoadingOverlay from './components/LoadingOverlay';
+import PlaywrightExportModal from './components/PlaywrightExportModal';
+import LandingPage from './components/LandingPage';
+import { getGroqStatus } from './services/api';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 function App() {
-  const [page, setPage] = useState('generate');
+  const [page, setPage] = useState('landing');
   const [testCases, setTestCases] = useState([]);
   const [allTestCases, setAllTestCases] = useState([]);
   const [stats, setStats] = useState({ total: 0, byScenarioType: {}, byPriority: {} });
   const [loading, setLoading] = useState(false);
-  const [showSplash, setShowSplash] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-
-  // Splash screen timer
-  useEffect(() => {
-    const t = setTimeout(() => setShowSplash(false), 2800);
-    return () => clearTimeout(t);
-  }, []);
+  const [showPwModal, setShowPwModal] = useState(false);
+  const [pwExportData, setPwExportData] = useState([]);
+  const [groq, setGroq] = useState({ state: 'checking' });
 
   // Fetch all data from backend
 const fetchAll = useCallback(async () => {
@@ -65,8 +64,29 @@ const fetchAll = useCallback(async () => {
 }, []);
 
   useEffect(() => {
-    if (!showSplash) fetchAll();
-  }, [showSplash, fetchAll]);
+    fetchAll();
+  }, [fetchAll]);
+
+  // Groq AI connection check — gates test-case generation.
+  const checkGroq = useCallback(async (fresh = false) => {
+    setGroq(prev => ({ ...prev, state: 'checking' }));
+    const status = await getGroqStatus(fresh);
+    setGroq({
+      state: status?.connected ? 'connected' : 'disconnected',
+      model: status?.model || null,
+      message: status?.message || '',
+      rateLimited: !!status?.rateLimited,
+      latencyMs: status?.latencyMs ?? null,
+      checkedAt: status?.checkedAt || null,
+    });
+    return status;
+  }, []);
+
+  useEffect(() => {
+    checkGroq(false);
+    const t = setInterval(() => checkGroq(false), 60000);
+    return () => clearInterval(t);
+  }, [checkGroq]);
 
   // Auto-clear success messages
   useEffect(() => {
@@ -76,8 +96,19 @@ const fetchAll = useCallback(async () => {
     }
   }, [success]);
 
-  // Handle test case generation
+  // Handle test case generation (allowed only when Groq AI is connected)
   const handleGenerate = async (formData) => {
+    // Re-check live before spending a generation call, unless we already
+    // know we're connected.
+    if (groq.state !== 'connected') {
+      const status = await checkGroq(true);
+      if (!status?.connected) {
+        const msg = status?.message || 'Groq AI is not connected. Generation is disabled until the connection is restored.';
+        setError(msg);
+        return { success: false, message: msg };
+      }
+    }
+
     setLoading(true);
     setError('');
     setSuccess('');
@@ -100,6 +131,7 @@ const fetchAll = useCallback(async () => {
       }
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Generation process failed';
+      if (err.response?.data?.isConnectionError) checkGroq(true);
       setError(msg);
       return { success: false, message: msg };
     } finally {
@@ -142,6 +174,13 @@ const fetchAll = useCallback(async () => {
         return; 
     }
 
+    // Playwright opens the editable preview modal instead of downloading directly
+    if (format === 'playwright') {
+      setPwExportData(exportData);
+      setShowPwModal(true);
+      return;
+    }
+
     const timestamp = new Date().toISOString().slice(0, 10);
 
     if (format === 'csv') {
@@ -154,7 +193,7 @@ const fetchAll = useCallback(async () => {
           .join(',')
       );
       
-      const csvContent = [headers.join(','), ...rows].join('');
+      const csvContent = [headers.join(','), ...rows].join('\n');
       download(csvContent, 'text/csv', `test-cases-${timestamp}.csv`);
 
     } else if (format === 'json') {
@@ -204,7 +243,14 @@ const fetchAll = useCallback(async () => {
     document.body.removeChild(a); URL.revokeObjectURL(url);
   };
 
-  if (showSplash) return <SplashScreen />;
+  // Cinematic landing — nav + hero only, no extra chrome.
+  if (page === 'landing') {
+    return (
+      <div className="App">
+        <LandingPage onNavigate={setPage} />
+      </div>
+    );
+  }
 
   return (
     <div className="App">
@@ -214,6 +260,7 @@ const fetchAll = useCallback(async () => {
         currentPage={page}
         onPageChange={setPage}
         historyCount={allTestCases.length}
+        onBrandClick={() => setPage('landing')}
       />
 
       <main className="app-main">
@@ -245,6 +292,8 @@ const fetchAll = useCallback(async () => {
               <TestCaseForm
                 onGenerate={handleGenerate}
                 loading={loading}
+                groqStatus={groq}
+                onRetryGroq={() => checkGroq(true)}
               />
 
               {testCases.length > 0 && (
@@ -265,6 +314,9 @@ const fetchAll = useCallback(async () => {
                     </button>
                     <button className="export-action-btn markdown" onClick={() => handleExport('markdown', testCases)}>
                       <FaMarkdown /> Export Markdown
+                    </button>
+                    <button className="export-action-btn playwright" onClick={() => handleExport('playwright', testCases)}>
+                      <FaFlask /> Export Playwright .spec.ts
                     </button>
                   </div>
                 </div>
@@ -304,10 +356,10 @@ const fetchAll = useCallback(async () => {
         <div className="container footer-content">
           <div className="footer-brand">
             <span className="copyright">© 2026</span>
-            <span className="brand-name">TestForge <span className="crimson">AI</span></span>
+            <span className="brand-name">Test-Case<span className="crimson">AI</span></span>
             <span className="footer-divider">|</span>
             <span className="engine-info">
-              <FaMicrochip className="footer-icon" /> Powered by <strong>Groq (Llama-3.3-70b)</strong>
+              <FaMicrochip className="footer-icon" /> Powered by <strong>Groq AI</strong>
             </span>
           </div>
           <div className="footer-links">
@@ -320,6 +372,16 @@ const fetchAll = useCallback(async () => {
           </div>
         </div>
       </footer>
+
+      {showPwModal && (
+        <PlaywrightExportModal
+          testCases={pwExportData}
+          onClose={() => setShowPwModal(false)}
+          onDownloaded={(scenarios, steps) =>
+            setSuccess(`Exported ${scenarios} scenario(s) / ${steps} step(s) as Playwright spec.ts`)
+          }
+        />
+      )}
     </div>
   );
 }

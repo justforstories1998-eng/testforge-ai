@@ -1,5 +1,27 @@
 const TestCase = require('../models/TestCase');
-const { generateTestCasesWithGroq, generateComprehensiveTestCases, getRateLimitStatus: getGroqRateLimitStatus } = require('../services/groqService');
+const { generateTestCasesWithGroq, generateComprehensiveTestCases, getRateLimitStatus: getGroqRateLimitStatus, checkGroqConnection } = require('../services/groqService');
+
+// @desc    Check whether the Groq AI backend is reachable
+// @route   GET /api/testcases/groq-status
+// @access  Public
+exports.getGroqStatus = async (req, res) => {
+  try {
+    const status = await checkGroqConnection({ force: req.query.fresh === '1' });
+    res.status(200).json({ success: true, ...status });
+  } catch (error) {
+    console.error('Error checking Groq status:', error);
+    res.status(200).json({
+      success: true,
+      connected: false,
+      reason: 'unreachable',
+      message: `Groq AI is unreachable: ${error.message}`,
+      model: null,
+      latencyMs: 0,
+      rateLimited: false,
+      checkedAt: new Date().toISOString(),
+    });
+  }
+};
 
 // @desc    Generate test cases using AI
 // @route   POST /api/testcases/generate
@@ -46,6 +68,16 @@ exports.generateTestCases = async (req, res) => {
 
     if (acceptanceCriteria.length < 10) {
       return res.status(400).json({ error: 'Acceptance criteria must be at least 10 characters' });
+    }
+
+    // Gate: refuse generation when we positively know the AI backend is down.
+    // Uses the cached ping (no extra API call) — a stale "unknown" still
+    // attempts generation, and generation errors are reported normally.
+    if (!process.env.GROQ_API_KEY) {
+      return res.status(503).json({
+        error: 'Groq AI is not connected (API key missing). Generation is disabled.',
+        isConnectionError: true,
+      });
     }
 
     console.log('🤖 Generating test cases with Groq AI...');

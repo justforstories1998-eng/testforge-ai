@@ -1,27 +1,124 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+/* ============================================
+   TEST-CASEAI — TACTILE DARK (RED / BLACK)
+   Dark neumorphic system. Surfaces are never flat:
+   extruded (raised) or inset (depressed), with the
+   exact dual-shadow values below.
+   ============================================ */
 :root {
-  --primary: #be123c; /* Professional Crimson */
-  --primary-hover: #9f1239;
-  --slate-50: #f8fafc;
-  --slate-100: #f1f5f9;
-  --slate-200: #e2e8f0;
-  --slate-700: #334155;
-  --slate-900: #0f172a;
-  --text-main: #1e293b;
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  /* Surfaces — never pure black */
+  --neu-bg: #130a0d;
+  --neu-surface: #1e1116;
+  --neu-surface-2: #25151b;
+  --neu-inset: #100709;
+
+  /* Brand — vivid red (was amber), deep crimson depth */
+  --neu-accent: #f43f5e;
+  --neu-accent-deep: #be123c;
+  --neu-accent-soft: rgba(244, 63, 94, 0.14);
+  --neu-accent-border: rgba(244, 63, 94, 0.25);
+  --neu-accent-glow: rgba(244, 63, 94, 0.35);
+
+  /* Secondary data tone (was teal) — pale rose */
+  --neu-rose: #fda4af;
+  --neu-rose-dim: rgba(253, 164, 175, 0.14);
+
+  /* Text */
+  --neu-text: #f6eded;
+  --neu-muted: #b39aa1;
+  --neu-faint: #7a5f66;
+
+  /* The two sacred shadows — do not simplify */
+  --neu-ex: 8px 8px 12px rgba(0, 0, 0, 0.5), -8px -8px 12px rgba(255, 255, 255, 0.12);
+  --neu-ex-sm: 5px 5px 10px rgba(0, 0, 0, 0.5), -5px -5px 10px rgba(255, 255, 255, 0.1);
+  --neu-in: inset 6px 6px 8px rgba(0, 0, 0, 0.5), inset -6px -6px 8px rgba(255, 255, 255, 0.12);
+  --neu-in-sm: inset 4px 4px 6px rgba(0, 0, 0, 0.5), inset -4px -4px 6px rgba(255, 255, 255, 0.1);
+
+  --neu-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Legacy aliases so older rules keep resolving */
+  --primary: #f43f5e;
+  --primary-hover: #e11d48;
+  --slate-50: #f6eded;
+  --slate-100: #e8d9dd;
+  --slate-200: #3a232a;
+  --slate-700: #b39aa1;
+  --slate-900: #130a0d;
+  --text-main: #f6eded;
+  --text-secondary: #b39aa1;
+  --text-muted: #7a5f66;
+  --border-light: #3a232a;
+  --card-bg: #1e1116;
+  --border-color: rgba(244, 63, 94, 0.25);
+  --shadow: 8px 8px 12px rgba(0, 0, 0, 0.5), -8px -8px 12px rgba(255, 255, 255, 0.12);
+  --shadow-sm: 5px 5px 10px rgba(0, 0, 0, 0.5), -5px -5px 10px rgba(255, 255, 255, 0.1);
+  --shadow-md: 8px 8px 12px rgba(0, 0, 0, 0.5), -8px -8px 12px rgba(255, 255, 255, 0.12);
+  --radius-md: 16px;
+  --radius-lg: 32px;
+  --radius-xl: 32px;
+  --radius-full: 9999px;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: 'Inter', sans-serif;
-  background-color: var(--slate-50);
-  color: var(--text-main);
+  font-family: 'DM Sans', 'Inter', sans-serif;
+  background-color: var(--neu-bg);
+  background-image:
+    radial-gradient(circle at 15% 0%, rgba(244, 63, 94, 0.07) 0%, transparent 45%),
+    radial-gradient(circle at 90% 100%, rgba(190, 18, 60, 0.08) 0%, transparent 45%);
+  background-attachment: fixed;
+  color: var(--neu-text);
   -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Plus Jakarta Sans', 'DM Sans', sans-serif;
+  color: var(--neu-text);
+}
+
+code, pre, .mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+::selection {
+  background: rgba(244, 63, 94, 0.4);
+  color: #fff;
 }
 
 .container {
   max-width: 1100px;
   margin: 0 auto;
   padding: 0 2rem;
+}
+
+/* Global scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--neu-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: #3a232a;
+  border-radius: 10px;
+  border: 2px solid var(--neu-bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neu-accent-deep);
+}
+
+/* Visible keyboard focus everywhere */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--neu-accent);
+  outline-offset: 2px;
 }
