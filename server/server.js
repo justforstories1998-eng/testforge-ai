@@ -15,7 +15,6 @@ const app = express();
 // 3. Unified CORS Configuration
 // This handles both local development and your production Netlify site
 const allowedOrigins = [
-  'https://testforge-ai.netlify.app',
   'http://localhost:3000',
   'http://127.0.0.1:3000'
 ];

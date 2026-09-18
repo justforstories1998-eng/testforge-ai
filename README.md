@@ -59,9 +59,8 @@ npm run test-groq
 
 ```
 ├── client/           # React app (landing, generate, repository, insights)
-├── server/           # Express API (Groq service, routes, in-memory model)
-├── api/              # Vercel serverless mirror of the API
-├── netlify.toml      # Netlify client deploy config
+├── server/           # Express API for local development
+├── api/              # Vercel serverless API (production)
 └── vercel.json       # Vercel deploy config
 ```
 
@@ -90,5 +89,8 @@ In production the client calls same-origin `/api` (see `client/.env.production`)
 
 ## Deployment
 
-- **Client:** Netlify (`netlify.toml`, SPA fallback included) or Vercel (`vercel.json`).
-- **API:** Vercel serverless functions in `api/`. Set `GROQ_API_KEY` (and optionally `GROQ_MODEL`) in the host's environment variables.
+Vercel only. `vercel.json` builds the client and serves the serverless API in `api/` from the same project.
+
+1. Import the repo in Vercel (or `vercel --prod`).
+2. Set environment variables: `GROQ_API_KEY` (required), `GROQ_MODEL` (optional, defaults to `openai/gpt-oss-120b`).
+3. Redeploy after changing env vars.
