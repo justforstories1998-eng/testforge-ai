@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaHome, FaMagic, FaHistory, FaChartBar } from 'react-icons/fa';
+import { FaMagic, FaHistory, FaChartBar } from 'react-icons/fa';
 import Logo from './Logo';
 import './Sidebar.css';
 
@@ -35,15 +35,6 @@ function Sidebar({ currentPage, historyCount, groq, onNavigate, onNavDone }) {
       </button>
 
       <nav className="side-nav">
-        <p className="side-label">Menu</p>
-        <button
-          className={`side-item ${currentPage === 'landing' ? 'active' : ''}`}
-          onClick={go('landing')}
-        >
-          <span className="side-ico"><FaHome /></span>
-          <span className="side-text">Home</span>
-        </button>
-
         <p className="side-label">Workspace</p>
         {NAV.map((item) => (
           <button
