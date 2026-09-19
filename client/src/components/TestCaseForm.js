@@ -14,6 +14,7 @@ import {
 import './TestCaseForm.css';
 import GroqStatus from './GroqStatus';
 import ModelSelector from './ModelSelector';
+import ReasoningSelector from './ReasoningSelector';
 
 function TestCaseForm({
   onGenerate,
@@ -23,6 +24,8 @@ function TestCaseForm({
   model,
   models,
   onModelChange,
+  reasoning,
+  onReasoningChange,
   acceptanceCriteria,
   onAcceptanceChange,
   onMetaChange,
@@ -95,6 +98,7 @@ function TestCaseForm({
       ...formData,
       acceptanceCriteria,
       model,
+      reasoning,
       numberOfScenarios: isComprehensive ? 'auto' : formData.numberOfScenarios,
       numberOfSteps: isComprehensive ? 'auto' : formData.numberOfSteps
     };
@@ -130,14 +134,23 @@ function TestCaseForm({
         {/* Groq AI connection — generation is allowed only when connected */}
         <GroqStatus status={groqStatus} onRetry={onRetryGroq} />
 
-        {/* AI Model selection */}
-        <div className="tc-form-group tc-full-width">
-          <ModelSelector
-            models={models}
-            value={model}
-            onChange={onModelChange}
-            disabled={loading}
-          />
+        {/* AI Model + reasoning selection */}
+        <div className="tc-form-row">
+          <div className="tc-form-group">
+            <ModelSelector
+              models={models}
+              value={model}
+              onChange={onModelChange}
+              disabled={loading}
+            />
+          </div>
+          <div className="tc-form-group">
+            <ReasoningSelector
+              value={reasoning}
+              onChange={onReasoningChange}
+              disabled={loading}
+            />
+          </div>
         </div>
 
         <form className="tc-main-form" onSubmit={handleSubmit}>

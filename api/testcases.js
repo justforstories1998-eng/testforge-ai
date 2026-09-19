@@ -21,14 +21,48 @@ const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
 // Model registry — mirrors server/services/groqService.js (keep in sync).
 const SUPPORTED_MODELS = [
-  { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B', vision: false, maxOutput: 6000 },
+  { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B', vision: false, maxOutput: 6000, reasoning: 'effort' },
   // qwen tier caps output tokens per minute (~1000 OTPM) — keep requests small.
-  { id: 'qwen/qwen3.8-27b', label: 'Qwen 3.8 27B', vision: true, maxOutput: 900 },
+  { id: 'qwen/qwen3.8-27b', label: 'Qwen 3.8 27B', vision: true, maxOutput: 900, reasoning: 'toggle' },
 ];
 
 function maxOutputFor(modelId) {
   const found = SUPPORTED_MODELS.find((m) => m.id === modelId);
   return found?.maxOutput || 4000;
+}
+
+const REASONING_LEVELS = ['off', 'low', 'medium', 'high'];
+
+function resolveReasoning(requested) {
+  if (!requested) return 'medium';
+  const lvl = String(requested).toLowerCase();
+  if (!REASONING_LEVELS.includes(lvl)) {
+    throw new Error(`Invalid reasoning level "${requested}". Use: ${REASONING_LEVELS.join(', ')}`);
+  }
+  return lvl;
+}
+
+// Same Groq reality as the Express backend: gpt-oss takes
+// reasoning_effort low/medium/high; Qwen takes only none/default,
+// with Low/Medium/High refining depth via prompt hint.
+function reasoningRequestParams(modelId, level = 'medium') {
+  const lvl = REASONING_LEVELS.includes(level) ? level : 'medium';
+  if (String(modelId || '').startsWith('openai/gpt-oss')) {
+    return {
+      apiParams: lvl === 'off' ? {} : { reasoning_effort: lvl },
+      promptHint: '',
+    };
+  }
+  const hints = {
+    off: '',
+    low: 'Be concise: minimal elaboration, shortest correct answer.',
+    medium: '',
+    high: 'Reason step by step internally before answering; be thorough and precise.',
+  };
+  return {
+    apiParams: { reasoning_effort: lvl === 'off' ? 'none' : 'default' },
+    promptHint: hints[lvl] || '',
+  };
 }
 
 function getSupportedModels() {
@@ -209,15 +243,22 @@ async function handleGenerate(req, res) {
       return res.status(400).json({ error: modelError.message });
     }
 
+    let reasoning;
+    try {
+      reasoning = resolveReasoning((req.body || {}).reasoning);
+    } catch (reasoningError) {
+      return res.status(400).json({ error: reasoningError.message });
+    }
+
     const isComprehensiveMode = scenarioType === 'All';
     let generatedTestCases;
 
     if (isComprehensiveMode) {
-      generatedTestCases = await generateComprehensiveTestCases(acceptanceCriteria, { areaPath, assignedTo, state, model });
+      generatedTestCases = await generateComprehensiveTestCases(acceptanceCriteria, { areaPath, assignedTo, state, model, reasoning });
     } else {
       generatedTestCases = await generateStandardTestCases(acceptanceCriteria, {
         scenarioType, numberOfScenarios: parseInt(numberOfScenarios), numberOfSteps: parseInt(numberOfSteps),
-        areaPath, assignedTo, state, model
+        areaPath, assignedTo, state, model, reasoning
       });
     }
 
@@ -245,7 +286,8 @@ async function handleGenerate(req, res) {
       count: generatedTestCases.length,
       scenarios: headerRows,
       mode: isComprehensiveMode ? 'comprehensive' : 'standard',
-      model
+      model,
+      reasoning
     });
   } catch (error) {
     console.error('❌ Generate error:', error);
@@ -275,6 +317,13 @@ async function handleChat(req, res) {
       model = resolveModel(requestedModel);
     } catch (modelError) {
       return res.status(400).json({ success: false, error: modelError.message });
+    }
+
+    let reasoning;
+    try {
+      reasoning = resolveReasoning(req.body.reasoning);
+    } catch (reasoningError) {
+      return res.status(400).json({ success: false, error: reasoningError.message });
     }
 
     if (!['criteria', 'solo'].includes(mode)) {
@@ -323,7 +372,11 @@ async function handleChat(req, res) {
         hadImage: !!m.hadImage,
       }));
 
-    const groqMessages = [{ role: 'system', content: buildChatSystemPrompt(mode, criteria, !!image) }];
+    const { promptHint } = reasoningRequestParams(model, reasoning);
+    const basePrompt = buildChatSystemPrompt(mode, criteria, !!image);
+    const groqMessages = [
+      { role: 'system', content: promptHint ? `${basePrompt}\n\nStyle: ${promptHint}` : basePrompt },
+    ];
     for (const m of cleanHistory) {
       groqMessages.push({
         role: m.role,
@@ -352,6 +405,7 @@ async function handleChat(req, res) {
         model,
         temperature: mode === 'solo' ? 0.7 : 0.5,
         max_tokens: Math.min(6000, maxOutputFor(model)),
+        ...reasoningRequestParams(model, reasoning).apiParams,
       });
       content = response.choices[0]?.message?.content || '';
     } catch (groqError) {
@@ -380,13 +434,13 @@ async function handleChat(req, res) {
           `> ✅ Generated ${headerRows} test scenario(s) — loaded into Session Results below.`
         );
         return res.status(200).json({
-          success: true, model, reply, testCases: rows, count: rows.length, scenarios: headerRows,
+          success: true, model, reasoning, reply, testCases: rows, count: rows.length, scenarios: headerRows,
         });
       }
     }
 
     return res.status(200).json({
-      success: true, model, reply, testCases: null, count: 0, scenarios: 0,
+      success: true, model, reasoning, reply, testCases: null, count: 0, scenarios: 0,
     });
   } catch (error) {
     console.error('❌ Chat error:', error);
@@ -564,7 +618,7 @@ function checkRateLimit() {
 // AI GENERATION
 // ═══════════════════════════════════════════════════════════
 async function generateStandardTestCases(criteria, options) {
-  const { scenarioType, numberOfScenarios, numberOfSteps, areaPath, assignedTo, state, model } = options;
+  const { scenarioType, numberOfScenarios, numberOfSteps, areaPath, assignedTo, state, model, reasoning } = options;
 
   const prompt = `Generate ${numberOfScenarios} ${scenarioType} test cases for: "${criteria}"
 Each with ${numberOfSteps} steps. Title starts with "Verify". Return ONLY JSON array:
@@ -579,7 +633,8 @@ Each with ${numberOfSteps} steps. Title starts with "Verify". Return ONLY JSON a
       ],
       model: model || GROQ_MODEL,
       temperature: 0.5,
-      max_tokens: Math.min(4000, maxOutputFor(model))
+      max_tokens: Math.min(4000, maxOutputFor(model)),
+      ...reasoningRequestParams(model || GROQ_MODEL, reasoning).apiParams
     });
 
     const parsed = parseJson(response.choices[0]?.message?.content || '');
@@ -591,7 +646,7 @@ Each with ${numberOfSteps} steps. Title starts with "Verify". Return ONLY JSON a
 }
 
 async function generateComprehensiveTestCases(criteria, options) {
-  const { areaPath, assignedTo, state, model } = options;
+  const { areaPath, assignedTo, state, model, reasoning } = options;
 
   const prompt = `Generate comprehensive test cases for: "${criteria}"
 Include: Positive (2-3), Negative (2-3), Boundary (1-2), Edge (1-2).
@@ -607,7 +662,8 @@ Each with scenarioType field, 4-6 steps. Return ONLY JSON:
       ],
       model: model || GROQ_MODEL,
       temperature: 0.4,
-      max_tokens: Math.min(6000, maxOutputFor(model))
+      max_tokens: Math.min(6000, maxOutputFor(model)),
+      ...reasoningRequestParams(model || GROQ_MODEL, reasoning).apiParams
     });
 
     const parsed = parseJson(response.choices[0]?.message?.content || '');

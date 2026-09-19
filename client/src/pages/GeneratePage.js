@@ -22,11 +22,16 @@ function GeneratePage({
   model,
   models,
   onModelChange,
+  reasoning,
+  onReasoningChange,
   onGenerate,
   onDelete,
   onExport,
   onRetryGroq,
   onChatTestCases,
+  chatExport,
+  onExportChat,
+  onClearChat,
   notify,
 }) {
   // Acceptance criteria lives here so both the form and the AI chat
@@ -63,6 +68,8 @@ function GeneratePage({
           model={model}
           models={models}
           onModelChange={onModelChange}
+          reasoning={reasoning}
+          onReasoningChange={onReasoningChange}
           acceptanceCriteria={acceptanceCriteria}
           onAcceptanceChange={setAcceptanceCriteria}
           onMetaChange={(meta) => {
@@ -133,9 +140,14 @@ function GeneratePage({
         model={model}
         models={models}
         onModelChange={onModelChange}
+        reasoning={reasoning}
+        onReasoningChange={onReasoningChange}
         aiReady={groqStatus?.state === 'connected'}
         onInsertCriteria={handleInsertCriteria}
         onTestCasesGenerated={onChatTestCases}
+        chatExport={chatExport}
+        onExportChat={onExportChat}
+        onClearChat={onClearChat}
       />
 
       {testCases.length > 0 && (

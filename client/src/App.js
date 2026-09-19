@@ -88,6 +88,8 @@ function Shell() {
   const [navOpen, setNavOpen] = useState(false);
   const [model, setModel] = useState(DEFAULT_MODEL);
   const [models, setModels] = useState(SUPPORTED_MODELS_FALLBACK);
+  const [reasoning, setReasoning] = useState('medium');
+  const [chatExport, setChatExport] = useState(null);
   // Ref mirror so stable callbacks always read the selected model.
   const modelRef = useRef(DEFAULT_MODEL);
   useEffect(() => {
@@ -240,8 +242,9 @@ const fetchAll = useCallback(async () => {
           ? ' (Comprehensive Mode)'
           : '';
         const usedModel = res.data?.model || formData?.model || model;
+        const usedReasoning = res.data?.reasoning || formData?.reasoning || reasoning;
         setSuccess(
-          `Successfully generated ${scenarios} test scenarios totalling ${total} rows${modeTag} with ${modelLabel(usedModel)}`
+          `Successfully generated ${scenarios} test scenarios totalling ${total} rows${modeTag} with ${modelLabel(usedModel)} · ${usedReasoning} reasoning`
         );
         return { success: true };
       } else {
@@ -263,6 +266,12 @@ const fetchAll = useCallback(async () => {
     async (chatTestCases, info = {}) => {
       if (!chatTestCases?.length) return;
       setTestCases(chatTestCases);
+      setChatExport({
+        testCases: chatTestCases,
+        scenarios: info.scenarios || 0,
+        count: info.count || chatTestCases.length,
+        model: info.model || modelRef.current,
+      });
       await fetchAll();
       const usedModel = info.model || modelRef.current;
       const found = models.find((m) => m.id === usedModel);
@@ -272,6 +281,23 @@ const fetchAll = useCallback(async () => {
     },
     [fetchAll, models]
   );
+
+  // Export the chat-generated rows via the standard export pipeline.
+  const handleExportChat = useCallback(
+    (format) => {
+      if (!chatExport?.testCases?.length) {
+        setError('No chat-generated test cases to export yet.');
+        return;
+      }
+      handleExport(format, chatExport.testCases);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chatExport]
+  );
+
+  const handleClearChat = useCallback(() => {
+    setChatExport(null);
+  }, []);
 
   // Delete a specific row
   const handleDelete = async (index) => {
@@ -453,11 +479,16 @@ const fetchAll = useCallback(async () => {
               model={model}
               models={models}
               onModelChange={setModel}
+              reasoning={reasoning}
+              onReasoningChange={setReasoning}
               onGenerate={handleGenerate}
               onDelete={handleDelete}
               onExport={handleExport}
               onRetryGroq={retryGroqConnection}
               onChatTestCases={handleChatTestCases}
+              chatExport={chatExport}
+              onExportChat={handleExportChat}
+              onClearChat={handleClearChat}
               notify={setSuccess}
             />
           )}

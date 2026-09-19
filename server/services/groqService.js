@@ -11,10 +11,51 @@ const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 // `vision: true` models accept image_url content parts.
 // ═══════════════════════════════════════════════════════════
 const SUPPORTED_MODELS = [
-  { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B', vision: false, maxOutput: 6000 },
+  { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B', vision: false, maxOutput: 6000, reasoning: 'effort' },
   // qwen tier caps output tokens per minute (~1000 OTPM) — keep requests small.
-  { id: 'qwen/qwen3.8-27b', label: 'Qwen 3.8 27B', vision: true, maxOutput: 900 },
+  { id: 'qwen/qwen3.8-27b', label: 'Qwen 3.8 27B', vision: true, maxOutput: 900, reasoning: 'toggle' },
 ];
+
+// Reasoning levels offered in the UI for every model.
+const REASONING_LEVELS = ['off', 'low', 'medium', 'high'];
+
+function resolveReasoning(requested) {
+  if (!requested) return 'medium';
+  const lvl = String(requested).toLowerCase();
+  if (!REASONING_LEVELS.includes(lvl)) {
+    throw new Error(`Invalid reasoning level "${requested}". Use: ${REASONING_LEVELS.join(', ')}`);
+  }
+  return lvl;
+}
+
+/**
+ * Map a UI reasoning level to real Groq request params.
+ * Groq reality (console.groq.com/docs/reasoning):
+ * - gpt-oss family: reasoning_effort low/medium/high (omit = model default).
+ * - Qwen family: reasoning_effort accepts ONLY "none" (off) or "default" (on).
+ *   Low/Medium/High still differ via `promptHint` — an instruction appended
+ *   to the system prompt that genuinely changes answer depth.
+ */
+function reasoningRequestParams(modelId, level = 'medium') {
+  const lvl = REASONING_LEVELS.includes(level) ? level : 'medium';
+  const isGptOss = String(modelId || '').startsWith('openai/gpt-oss');
+  if (isGptOss) {
+    return {
+      apiParams: lvl === 'off' ? {} : { reasoning_effort: lvl },
+      promptHint: '',
+    };
+  }
+  const hints = {
+    off: '',
+    low: 'Be concise: minimal elaboration, shortest correct answer.',
+    medium: '',
+    high: 'Reason step by step internally before answering; be thorough and precise.',
+  };
+  return {
+    apiParams: { reasoning_effort: lvl === 'off' ? 'none' : 'default' },
+    promptHint: hints[lvl] || '',
+  };
+}
 
 function maxOutputFor(modelId) {
   const found = SUPPORTED_MODELS.find((m) => m.id === modelId);
@@ -58,14 +99,16 @@ async function makeGroqRequest(messages, options = {}) {
   const {
     model = GROQ_MODEL,
     temperature = 0.5,
-    maxTokens = 2000
+    maxTokens = 2000,
+    reasoning = 'medium'
   } = options;
 
   const completion = await groq.chat.completions.create({
     messages,
     model,
     temperature,
-    max_tokens: Math.min(maxTokens, maxOutputFor(model))
+    max_tokens: Math.min(maxTokens, maxOutputFor(model)),
+    ...reasoningRequestParams(model, reasoning).apiParams,
   });
 
   return completion.choices[0]?.message?.content || '';
@@ -83,7 +126,8 @@ async function generateComprehensiveTestCases(acceptanceCriteria, options = {}) 
     areaPath = 'Subscription/Billing/Data',
     assignedTo = 'Unassigned',
     state = 'New',
-    model
+    model,
+    reasoning
   } = options;
 
   console.log('═══════════════════════════════════════════════════════════');
@@ -96,7 +140,7 @@ async function generateComprehensiveTestCases(acceptanceCriteria, options = {}) 
   try {
     // Step 1: Deep analysis of acceptance criteria
     console.log('\n📖 STEP 1: Performing deep analysis...');
-    const analysis = await performDeepAnalysis(acceptanceCriteria, options.model);
+    const analysis = await performDeepAnalysis(acceptanceCriteria, options.model, options.reasoning);
     
     if (!analysis) {
       throw new Error('Failed to analyze acceptance criteria');
@@ -121,7 +165,7 @@ async function generateComprehensiveTestCases(acceptanceCriteria, options = {}) 
         analysis.positiveScenarios,
         'Positive',
         acceptanceCriteria,
-        { areaPath, assignedTo, state, model }
+        { areaPath, assignedTo, state, model, reasoning }
       );
       allTestCases.push(...positiveTests);
       console.log(`   ✓ Generated ${positiveTests.filter(t => t.workItemType === 'Test Case').length} Positive scenarios`);
@@ -134,7 +178,7 @@ async function generateComprehensiveTestCases(acceptanceCriteria, options = {}) 
         analysis.negativeScenarios,
         'Negative',
         acceptanceCriteria,
-        { areaPath, assignedTo, state, model }
+        { areaPath, assignedTo, state, model, reasoning }
       );
       allTestCases.push(...negativeTests);
       console.log(`   ✗ Generated ${negativeTests.filter(t => t.workItemType === 'Test Case').length} Negative scenarios`);
@@ -147,7 +191,7 @@ async function generateComprehensiveTestCases(acceptanceCriteria, options = {}) 
         analysis.boundaryScenarios,
         'Boundary',
         acceptanceCriteria,
-        { areaPath, assignedTo, state, model }
+        { areaPath, assignedTo, state, model, reasoning }
       );
       allTestCases.push(...boundaryTests);
       console.log(`   ⚡ Generated ${boundaryTests.filter(t => t.workItemType === 'Test Case').length} Boundary scenarios`);
@@ -160,7 +204,7 @@ async function generateComprehensiveTestCases(acceptanceCriteria, options = {}) 
         analysis.edgeCases,
         'Edge',
         acceptanceCriteria,
-        { areaPath, assignedTo, state, model }
+        { areaPath, assignedTo, state, model, reasoning }
       );
       allTestCases.push(...edgeTests);
       console.log(`   🔍 Generated ${edgeTests.filter(t => t.workItemType === 'Test Case').length} Edge Case scenarios`);
@@ -190,7 +234,7 @@ async function generateComprehensiveTestCases(acceptanceCriteria, options = {}) 
   }
 }
 
-async function performDeepAnalysis(acceptanceCriteria, model) {
+async function performDeepAnalysis(acceptanceCriteria, model, reasoning) {
   const prompt = `You are an expert QA analyst. Analyze this acceptance criteria THOROUGHLY and identify ALL possible test scenarios.
 
 READ EVERY SINGLE WORD CAREFULLY:
@@ -251,7 +295,7 @@ IMPORTANT:
           content: prompt
         }
       ],
-      { temperature: 0.4, maxTokens: 4000, model }
+      { temperature: 0.4, maxTokens: 4000, model, reasoning }
     );
 
     console.log('\n📄 Raw Analysis Response (first 500 chars):', response.substring(0, 500));
@@ -386,12 +430,12 @@ function extractScenariosManually(acceptanceCriteria) {
 }
 
 async function generateTestCasesFromScenarios(scenarios, scenarioType, acceptanceCriteria, options) {
-  const { areaPath, assignedTo, state, model } = options;
+  const { areaPath, assignedTo, state, model, reasoning } = options;
   const allTestCases = [];
 
   for (const scenario of scenarios) {
     try {
-      const steps = await generateStepsForScenario(scenario, scenarioType, acceptanceCriteria, model);
+      const steps = await generateStepsForScenario(scenario, scenarioType, acceptanceCriteria, model, reasoning);
       
       allTestCases.push({
         id: '',
@@ -494,7 +538,7 @@ async function generateTestCasesFromScenarios(scenarios, scenarioType, acceptanc
   return allTestCases;
 }
 
-async function generateStepsForScenario(scenario, scenarioType, acceptanceCriteria, model) {
+async function generateStepsForScenario(scenario, scenarioType, acceptanceCriteria, model, reasoning) {
   const prompt = `Generate detailed test steps for this specific test case:
 
 TEST CASE: "${scenario}"
@@ -528,7 +572,7 @@ Return ONLY this JSON array (no markdown, no explanation):
           content: prompt
         }
       ],
-      { temperature: 0.5, maxTokens: 2000, model }
+      { temperature: 0.5, maxTokens: 2000, model, reasoning }
     );
 
     const cleaned = cleanJsonResponse(response);
@@ -750,7 +794,8 @@ async function generateTestCasesWithGroq(acceptanceCriteria, options = {}) {
     areaPath = 'Subscription/Billing/Data',
     assignedTo = 'Unassigned',
     state = 'New',
-    model
+    model,
+    reasoning
   } = options;
 
   console.log('═══════════════════════════════════════════════════════════');
@@ -763,7 +808,7 @@ async function generateTestCasesWithGroq(acceptanceCriteria, options = {}) {
   console.log('═══════════════════════════════════════════════════════════');
 
   try {
-    const titles = await generateTitlesForType(acceptanceCriteria, scenarioType, numberOfScenarios, platforms, model);
+    const titles = await generateTitlesForType(acceptanceCriteria, scenarioType, numberOfScenarios, platforms, model, reasoning);
     
     if (!titles || titles.length === 0) {
       throw new Error('Failed to generate test case titles');
@@ -777,7 +822,7 @@ async function generateTestCasesWithGroq(acceptanceCriteria, options = {}) {
       const title = titles[i];
       console.log(`   ${i + 1}. ${title.substring(0, 60)}...`);
       
-      const steps = await generateStepsForScenario(title, scenarioType, acceptanceCriteria, model);
+      const steps = await generateStepsForScenario(title, scenarioType, acceptanceCriteria, model, reasoning);
       const limitedSteps = steps.slice(0, numberOfSteps);
       
       while (limitedSteps.length < numberOfSteps) {
@@ -829,7 +874,7 @@ async function generateTestCasesWithGroq(acceptanceCriteria, options = {}) {
   }
 }
 
-async function generateTitlesForType(acceptanceCriteria, scenarioType, count, platforms, model) {
+async function generateTitlesForType(acceptanceCriteria, scenarioType, count, platforms, model, reasoning) {
   const typeDescriptions = {
     'Positive': 'successful/valid/working scenarios where everything works as expected',
     'Negative': 'error handling/invalid input/failure scenarios where the system should reject or handle errors',
@@ -867,7 +912,7 @@ Return ONLY a JSON array of strings:
           content: prompt
         }
       ],
-      { temperature: 0.6, maxTokens: 2000, model }
+      { temperature: 0.6, maxTokens: 2000, model, reasoning }
     );
 
     const cleaned = cleanJsonResponse(response);
@@ -1137,7 +1182,7 @@ function cacheAndReturn(model, result) {
 // ═══════════════════════════════════════════════════════════
 
 async function chatWithGroq(messages, options = {}) {
-  const { model: requestedModel, temperature = 0.5, maxTokens = 4000 } = options;
+  const { model: requestedModel, temperature = 0.5, maxTokens = 4000, reasoning = 'medium' } = options;
   const model = resolveModel(requestedModel);
   rateLimiter.checkLimit();
 
@@ -1146,6 +1191,7 @@ async function chatWithGroq(messages, options = {}) {
     model,
     temperature,
     max_tokens: Math.min(maxTokens, maxOutputFor(model)),
+    ...reasoningRequestParams(model, reasoning).apiParams,
   });
 
   return {
@@ -1255,5 +1301,8 @@ module.exports = {
   resolveModel,
   modelSupportsVision,
   maxOutputFor,
+  resolveReasoning,
+  reasoningRequestParams,
+  REASONING_LEVELS,
   SUPPORTED_MODELS,
 };

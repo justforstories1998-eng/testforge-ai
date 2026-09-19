@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   FaRobot,
   FaUser,
@@ -13,8 +15,12 @@ import {
   FaPlus,
   FaExchangeAlt,
   FaSpinner,
+  FaFileCsv,
+  FaMarkdown,
+  FaFlask,
 } from 'react-icons/fa';
 import ModelSelector from './ModelSelector';
+import ReasoningSelector from './ReasoningSelector';
 import { chatWithAI } from '../services/api';
 import './ChatBox.css';
 
@@ -43,9 +49,14 @@ function ChatBox({
   model,
   models,
   onModelChange,
+  reasoning,
+  onReasoningChange,
   aiReady,
   onInsertCriteria,
   onTestCasesGenerated,
+  chatExport,
+  onExportChat,
+  onClearChat,
 }) {
   const [mode, setMode] = useState('criteria');
   const [messages, setMessages] = useState([]);
@@ -164,6 +175,7 @@ function ChatBox({
           {
             model,
             mode,
+            reasoning,
             acceptanceCriteria: mode === 'criteria' ? criteria || '' : '',
             meta: meta || {},
             history,
@@ -210,7 +222,7 @@ function ChatBox({
         stickRef.current = true;
       }
     },
-    [input, image, sending, aiReady, visionOn, messages, pushMessage, model, mode, criteria, meta, onTestCasesGenerated]
+    [input, image, sending, aiReady, visionOn, messages, pushMessage, model, mode, reasoning, criteria, meta, onTestCasesGenerated]
   );
 
   const stop = () => {
@@ -225,11 +237,12 @@ function ChatBox({
 
   const clearConversation = () => {
     if (sending) return;
-    if (messages.length === 0) return;
+    if (messages.length === 0 && !image) return;
     if (!window.confirm('Clear this conversation?')) return;
     setMessages([]);
     setImage(null);
     setInput('');
+    if (onClearChat) onClearChat();
   };
 
   const switchMode = (next) => {
@@ -326,11 +339,17 @@ function ChatBox({
             disabled={sending}
             compact
           />
+          <ReasoningSelector
+            value={reasoning}
+            onChange={onReasoningChange}
+            disabled={sending}
+            compact
+          />
           <button
             type="button"
             className="icon-btn"
             onClick={clearConversation}
-            disabled={sending || messages.length === 0}
+            disabled={sending || (messages.length === 0 && !image)}
             title="Clear conversation"
             aria-label="Clear conversation"
           >
@@ -394,8 +413,16 @@ function ChatBox({
                       <FaSyncAlt /> Retry
                     </button>
                   </div>
-                ) : (
+                ) : isUser ? (
                   msg.content && <p className="chat-text">{msg.content}</p>
+                ) : (
+                  msg.content && (
+                    <div className="chat-md">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
+                  )
                 )}
                 {msg.testInfo && (
                   <p className="chat-testinfo">
@@ -561,6 +588,25 @@ function ChatBox({
         Enter send · Shift+Enter newline · Esc stop · paste / drag &amp; drop images
         {visionOn ? '' : ' (images need the vision model)'}
       </p>
+
+      {chatExport?.testCases?.length > 0 && (
+        <div className="chat-export-bar">
+          <span className="chat-export-label">
+            ✅ {chatExport.scenarios || 0} scenario(s) generated — export:
+          </span>
+          <span className="chat-export-actions">
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => onExportChat('csv')}>
+              <FaFileCsv /> CSV
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => onExportChat('markdown')}>
+              <FaMarkdown /> Markdown
+            </button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => onExportChat('playwright')}>
+              <FaFlask /> .spec.ts
+            </button>
+          </span>
+        </div>
+      )}
 
       {dragOver && (
         <div className="chat-drop-veil" aria-hidden="true">

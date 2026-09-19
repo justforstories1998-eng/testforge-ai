@@ -11,6 +11,8 @@ const {
   getSupportedModels: getModelList,
   resolveModel,
   modelSupportsVision,
+  resolveReasoning,
+  reasoningRequestParams,
 } = require('../services/groqService');
 
 // @desc    List supported AI models
@@ -76,6 +78,13 @@ exports.chatWithAI = async (req, res) => {
       return res.status(400).json({ success: false, error: modelError.message });
     }
 
+    let reasoning;
+    try {
+      reasoning = resolveReasoning(req.body.reasoning);
+    } catch (reasoningError) {
+      return res.status(400).json({ success: false, error: reasoningError.message });
+    }
+
     if (!['criteria', 'solo'].includes(mode)) {
       return res.status(400).json({ success: false, error: 'mode must be "criteria" or "solo"' });
     }
@@ -113,7 +122,12 @@ exports.chatWithAI = async (req, res) => {
     const systemPrompt =
       mode === 'solo' ? buildSoloPrompt() : buildCriteriaPrompt(criteria, !!image);
 
-    const groqMessages = [{ role: 'system', content: systemPrompt }];
+    // Qwen exposes reasoning as on/off on Groq; Low/Medium/High refine depth
+    // through this instruction (gpt-oss gets a native reasoning_effort param).
+    const { promptHint } = reasoningRequestParams(model, reasoning);
+    const groqMessages = [
+      { role: 'system', content: promptHint ? `${systemPrompt}\n\nStyle: ${promptHint}` : systemPrompt },
+    ];
     for (const m of cleanHistory) {
       groqMessages.push({
         role: m.role,
@@ -140,6 +154,7 @@ exports.chatWithAI = async (req, res) => {
         model,
         temperature: mode === 'solo' ? 0.7 : 0.5,
         maxTokens: 6000,
+        reasoning,
       });
     } catch (groqError) {
       if (/rate limit|429|rate_limit|request too large|quota/i.test(groqError.message || '')) {
@@ -179,6 +194,7 @@ exports.chatWithAI = async (req, res) => {
         return res.status(200).json({
           success: true,
           model: result.model,
+          reasoning,
           reply,
           testCases: rows,
           count: rows.length,
@@ -190,6 +206,7 @@ exports.chatWithAI = async (req, res) => {
     return res.status(200).json({
       success: true,
       model: result.model,
+      reasoning,
       reply,
       testCases: null,
       count: 0,
@@ -276,12 +293,18 @@ exports.generateTestCases = async (req, res) => {
       return res.status(400).json({ error: 'Acceptance criteria must be at least 10 characters' });
     }
 
-    // Model selection (validated against the registry)
+    // Model + reasoning selection (validated against the registry)
     let model;
     try {
       model = resolveModel(req.body.model);
     } catch (modelError) {
       return res.status(400).json({ error: modelError.message });
+    }
+    let reasoning;
+    try {
+      reasoning = resolveReasoning(req.body.reasoning);
+    } catch (reasoningError) {
+      return res.status(400).json({ error: reasoningError.message });
     }
 
     // Gate: refuse generation when we positively know the AI backend is down.
@@ -308,7 +331,8 @@ exports.generateTestCases = async (req, res) => {
           areaPath,
           assignedTo,
           state,
-          model
+          model,
+          reasoning
         });
       } else {
         // Use standard generation
@@ -321,7 +345,8 @@ exports.generateTestCases = async (req, res) => {
           areaPath,
           assignedTo,
           state,
-          model
+          model,
+          reasoning
         });
       }
     } catch (groqError) {
@@ -376,7 +401,8 @@ exports.generateTestCases = async (req, res) => {
       count: generatedTestCases.length,
       scenarios: headerRows,
       mode: isComprehensiveMode ? 'comprehensive' : 'standard',
-      model
+      model,
+      reasoning
     });
 
   } catch (error) {

@@ -404,6 +404,161 @@
   border-color: var(--accent);
 }
 
+/* ---------- Rendered Markdown (AI messages) ---------- */
+.chat-md {
+  font-size: 0.88rem;
+  line-height: 1.62;
+  word-break: break-word;
+  min-width: 0;
+}
+
+.chat-md > *:first-child {
+  margin-top: 0;
+}
+
+.chat-md > *:last-child {
+  margin-bottom: 0;
+}
+
+.chat-md h1,
+.chat-md h2,
+.chat-md h3,
+.chat-md h4 {
+  margin: 0.9em 0 0.4em;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.chat-md h1 { font-size: 1.12rem; }
+.chat-md h2 { font-size: 1.02rem; }
+.chat-md h3 { font-size: 0.95rem; }
+.chat-md h4 { font-size: 0.88rem; }
+
+.chat-md p {
+  margin: 0.45em 0;
+}
+
+.chat-md ul,
+.chat-md ol {
+  margin: 0.45em 0;
+  padding-left: 1.35rem;
+}
+
+.chat-md li {
+  margin: 0.2em 0;
+}
+
+.chat-md li::marker {
+  color: var(--accent);
+}
+
+.chat-md table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0.7em 0;
+  font-size: 0.8rem;
+}
+
+.chat-md thead {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.chat-md th,
+.chat-md td {
+  border: 1px solid var(--border);
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+  white-space: normal;
+}
+
+.chat-md th {
+  color: var(--rose);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.chat-md code {
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid var(--border);
+  padding: 0.08em 0.35em;
+  border-radius: 5px;
+  color: var(--rose);
+}
+
+.chat-md pre {
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 0.7rem 0.85rem;
+  overflow-x: auto;
+  margin: 0.6em 0;
+}
+
+.chat-md pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #f0c9d1;
+  font-size: 0.76rem;
+}
+
+.chat-md blockquote {
+  margin: 0.55em 0;
+  padding: 0.45rem 0.8rem;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-faint);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  color: var(--text);
+}
+
+.chat-md blockquote p {
+  margin: 0.2em 0;
+}
+
+.chat-md a {
+  color: var(--accent);
+}
+
+.chat-md hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0.8em 0;
+}
+
+.chat-md strong {
+  color: var(--text);
+}
+
+/* ---------- Export bar ---------- */
+.chat-export-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 1.4rem 1rem;
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.chat-export-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--rose);
+}
+
+.chat-export-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 720px) {
   .chat-header {
