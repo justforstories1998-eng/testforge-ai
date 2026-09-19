@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -24,7 +24,7 @@ import InsightsPage from './pages/InsightsPage';
 import LoadingOverlay from './components/LoadingOverlay';
 import PlaywrightExportModal from './components/PlaywrightExportModal';
 import LandingPage from './components/LandingPage';
-import { getGroqStatus, wakeBackend } from './services/api';
+import { getGroqStatus, wakeBackend, getModels, DEFAULT_MODEL, SUPPORTED_MODELS_FALLBACK } from './services/api';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
@@ -86,6 +86,13 @@ function Shell() {
   const [pwExportData, setPwExportData] = useState([]);
   const [groq, setGroq] = useState({ state: 'checking' });
   const [navOpen, setNavOpen] = useState(false);
+  const [model, setModel] = useState(DEFAULT_MODEL);
+  const [models, setModels] = useState(SUPPORTED_MODELS_FALLBACK);
+  // Ref mirror so stable callbacks always read the selected model.
+  const modelRef = useRef(DEFAULT_MODEL);
+  useEffect(() => {
+    modelRef.current = model;
+  }, [model]);
 
   // Fetch all data from backend
 const fetchAll = useCallback(async () => {
@@ -115,9 +122,11 @@ const fetchAll = useCallback(async () => {
   }, [fetchAll]);
 
   // Groq AI connection check — gates test-case generation.
-  const checkGroq = useCallback(async (fresh = false) => {
+  // Accepts a model override so the pill always reflects the SELECTED model.
+  const checkGroq = useCallback(async (fresh = false, modelOverride) => {
+    const activeModel = modelOverride || modelRef.current;
     setGroq(prev => ({ ...prev, state: 'checking' }));
-    const status = await getGroqStatus(fresh);
+    const status = await getGroqStatus(fresh, activeModel);
     setGroq({
       state: status?.connected ? 'connected' : 'disconnected',
       model: status?.model || null,
@@ -158,6 +167,31 @@ const fetchAll = useCallback(async () => {
     return () => clearInterval(t);
   }, [checkGroq]);
 
+  // Load the backend model registry once; fall back to the built-in list.
+  useEffect(() => {
+    let cancelled = false;
+    getModels().then((res) => {
+      if (cancelled) return;
+      if (res?.models?.length > 0) {
+        setModels(res.models);
+        if (res.defaultModel) {
+          setModel(res.defaultModel);
+          checkGroq(false, res.defaultModel);
+        }
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-check (cached, cheap) whenever the selected model changes.
+  useEffect(() => {
+    checkGroq(false, model);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model]);
+
   // Start each view at the top and close the mobile drawer.
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -171,6 +205,11 @@ const fetchAll = useCallback(async () => {
       return () => clearTimeout(t);
     }
   }, [success]);
+
+  const modelLabel = (id) => {
+    const found = models.find((m) => m.id === (id || model));
+    return found ? found.label || found.id : id || model;
+  };
 
   // Handle test case generation (allowed only when Groq AI is connected)
   const handleGenerate = async (formData) => {
@@ -200,7 +239,10 @@ const fetchAll = useCallback(async () => {
         const modeTag = res.data.mode === 'comprehensive'
           ? ' (Comprehensive Mode)'
           : '';
-        setSuccess(`Successfully generated ${scenarios} test scenarios totalling ${total} rows${modeTag}`);
+        const usedModel = res.data?.model || formData?.model || model;
+        setSuccess(
+          `Successfully generated ${scenarios} test scenarios totalling ${total} rows${modeTag} with ${modelLabel(usedModel)}`
+        );
         return { success: true };
       } else {
         throw new Error('No test cases were generated. Please refine your criteria.');
@@ -214,6 +256,22 @@ const fetchAll = useCallback(async () => {
       setLoading(false);
     }
   };
+
+  // Chat-generated test cases land in the session results, exactly like
+  // form-generated ones (same row shape, already saved server-side).
+  const handleChatTestCases = useCallback(
+    async (chatTestCases, info = {}) => {
+      if (!chatTestCases?.length) return;
+      setTestCases(chatTestCases);
+      await fetchAll();
+      const usedModel = info.model || modelRef.current;
+      const found = models.find((m) => m.id === usedModel);
+      setSuccess(
+        `Chat generated ${info.scenarios || 0} test scenario(s) totalling ${info.count || chatTestCases.length} rows with ${found?.label || usedModel}`
+      );
+    },
+    [fetchAll, models]
+  );
 
   // Delete a specific row
   const handleDelete = async (index) => {
@@ -392,10 +450,15 @@ const fetchAll = useCallback(async () => {
               stats={stats}
               loading={loading}
               groqStatus={groq}
+              model={model}
+              models={models}
+              onModelChange={setModel}
               onGenerate={handleGenerate}
               onDelete={handleDelete}
               onExport={handleExport}
               onRetryGroq={retryGroqConnection}
+              onChatTestCases={handleChatTestCases}
+              notify={setSuccess}
             />
           )}
 

@@ -66,12 +66,60 @@ export const exportAsPlaywright = (testCaseIds, options = {}) =>
     window.URL.revokeObjectURL(url);
   });
 
+// Fallback model list if the backend is unreachable. The backend
+// registry (GET /testcases/models) is the source of truth when online.
+export const SUPPORTED_MODELS_FALLBACK = [
+  { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B', vision: false },
+  { id: 'qwen/qwen3.8-27b', label: 'Qwen 3.8 27B', vision: true },
+];
+
+export const DEFAULT_MODEL = 'openai/gpt-oss-120b';
+
+// List supported AI models from the backend registry.
+export const getModels = async () => {
+  try {
+    const response = await api.get('/testcases/models', { timeout: 15000 });
+    return response.data;
+  } catch (error) {
+    console.error('Models fetch failed:', error);
+    return {
+      success: false,
+      models: SUPPORTED_MODELS_FALLBACK,
+      defaultModel: DEFAULT_MODEL,
+    };
+  }
+};
+
+// Chat with the AI assistant. Supports abort via AbortSignal (Stop button).
+// Payload: { model, mode, acceptanceCriteria, meta, history, text, image }
+export const chatWithAI = async (payload, { signal } = {}) => {
+  try {
+    const response = await api.post('/testcases/chat', payload, {
+      timeout: 120000,
+      signal,
+    });
+    return response.data;
+  } catch (error) {
+    if (error.code === 'ERR_CANCELED' || error.name === 'CanceledError') {
+      const canceled = new Error('Request canceled');
+      canceled.canceled = true;
+      throw canceled;
+    }
+    console.error('Chat API Error:', error);
+    throw error.response?.data || { message: error.message };
+  }
+};
+
 // Check whether the Groq AI backend is reachable.
 // Used to gate test-case generation. Short timeout so an offline
 // backend fails fast instead of hanging the UI.
-export const getGroqStatus = async (fresh = false) => {
+export const getGroqStatus = async (fresh = false, model) => {
   try {
-    const response = await api.get(`/testcases/groq-status${fresh ? '?fresh=1' : ''}`, {
+    const params = new URLSearchParams();
+    if (fresh) params.set('fresh', '1');
+    if (model) params.set('model', model);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const response = await api.get(`/testcases/groq-status${qs}`, {
       timeout: 15000,
     });
     return response.data;

@@ -4,7 +4,9 @@ AI-powered test case generator. Paste acceptance criteria, get enterprise-grade 
 
 ## Features
 
-- **AI generation** — Groq-powered test scenarios with step-by-step actions and expected results; generation is gated behind a live connection check, and Retry wakes a sleeping free-tier host before re-checking- **Playwright export** — runnable `.spec.ts` output with resilient locators, per-line `WHY` explanations, and an in-app preview/edit modal before download
+- **AI generation** — Groq-powered test scenarios with step-by-step actions and expected results; generation is gated behind a live connection check, and Retry wakes a sleeping free-tier host before re-checking
+- **Model choice** — switch between `openai/gpt-oss-120b` and vision-capable `qwen/qwen3.8-27b` from a dropdown; the selection drives generation, status checks, and chat
+- **AI chat** — assistant under the criteria form with Criteria/Solo modes, image attach (paste, drag & drop, picker) on the vision model, stop/retry/clear, and one-click insert back into Acceptance Criteria; test cases it generates load straight into Session Results- **Playwright export** — runnable `.spec.ts` output with resilient locators, per-line `WHY` explanations, and an in-app preview/edit modal before download
 - **More exports** — CSV, JSON, Markdown
 - **Repository** — searchable history of all generations, per-row delete, clear-all
 - **Insights** — scenario-type and priority distribution dashboard
@@ -68,7 +70,9 @@ npm run test-groq
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/api/testcases/generate` | Generate scenarios from acceptance criteria |
+| POST | `/api/testcases/generate` | Generate scenarios from acceptance criteria (`model` optional) |
+| POST | `/api/testcases/chat` | Chat with the AI (`mode`: criteria/solo, optional image, `model`) |
+| GET | `/api/testcases/models` | Supported models + default (`id`, `label`, `vision`) |
 | GET | `/api/testcases` | List all generated rows |
 | GET | `/api/testcases/groq-status` | AI connection status (`connected`, `model`, `latencyMs`) |
 | GET | `/api/testcases/statistics` | Counts by scenario type and priority |
@@ -83,7 +87,7 @@ In production the client calls same-origin `/api` (see `client/.env.production`)
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `GROQ_API_KEY` | Yes | — | Groq Cloud key (never committed; `.env` is gitignored) |
-| `GROQ_MODEL` | No | `openai/gpt-oss-120b` | Model for generation + status ping |
+| `GROQ_MODEL` | No | `openai/gpt-oss-120b` | Default model; must be a registry id (`openai/gpt-oss-120b`, `qwen/qwen3.8-27b`) |
 | `PORT` | No | `5000` | Backend port |
 | `REACT_APP_API_URL` | No | `http://localhost:5000/api` | Backend URL for local dev |
 

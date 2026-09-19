@@ -6,6 +6,47 @@ const rateLimiter = require('./rateLimiter');
 // Override per-environment with the GROQ_MODEL env var.
 const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
+// ═══════════════════════════════════════════════════════════
+// MODEL REGISTRY — single source of truth for supported models.
+// `vision: true` models accept image_url content parts.
+// ═══════════════════════════════════════════════════════════
+const SUPPORTED_MODELS = [
+  { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B', vision: false, maxOutput: 6000 },
+  // qwen tier caps output tokens per minute (~1000 OTPM) — keep requests small.
+  { id: 'qwen/qwen3.8-27b', label: 'Qwen 3.8 27B', vision: true, maxOutput: 900 },
+];
+
+function maxOutputFor(modelId) {
+  const found = SUPPORTED_MODELS.find((m) => m.id === modelId);
+  return found?.maxOutput || 4000;
+}
+
+function getSupportedModels() {
+  const fallback = SUPPORTED_MODELS.some((m) => m.id === GROQ_MODEL)
+    ? GROQ_MODEL
+    : SUPPORTED_MODELS[0].id;
+  return { models: SUPPORTED_MODELS, defaultModel: process.env.GROQ_MODEL || fallback };
+}
+
+function modelSupportsVision(modelId) {
+  const found = SUPPORTED_MODELS.find((m) => m.id === modelId);
+  return !!found?.vision;
+}
+
+// Validated model id or throws (controller maps to 400).
+function resolveModel(requested) {
+  if (!requested) {
+    return getSupportedModels().defaultModel;
+  }
+  const found = SUPPORTED_MODELS.find((m) => m.id === requested);
+  if (!found) {
+    throw new Error(
+      `Unsupported model "${requested}". Supported: ${SUPPORTED_MODELS.map((m) => m.id).join(', ')}`
+    );
+  }
+  return found.id;
+}
+
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
 });
@@ -24,7 +65,7 @@ async function makeGroqRequest(messages, options = {}) {
     messages,
     model,
     temperature,
-    max_tokens: maxTokens
+    max_tokens: Math.min(maxTokens, maxOutputFor(model))
   });
 
   return completion.choices[0]?.message?.content || '';
@@ -41,7 +82,8 @@ async function generateComprehensiveTestCases(acceptanceCriteria, options = {}) 
     platforms = ['Web'],
     areaPath = 'Subscription/Billing/Data',
     assignedTo = 'Unassigned',
-    state = 'New'
+    state = 'New',
+    model
   } = options;
 
   console.log('═══════════════════════════════════════════════════════════');
@@ -54,7 +96,7 @@ async function generateComprehensiveTestCases(acceptanceCriteria, options = {}) 
   try {
     // Step 1: Deep analysis of acceptance criteria
     console.log('\n📖 STEP 1: Performing deep analysis...');
-    const analysis = await performDeepAnalysis(acceptanceCriteria);
+    const analysis = await performDeepAnalysis(acceptanceCriteria, options.model);
     
     if (!analysis) {
       throw new Error('Failed to analyze acceptance criteria');
@@ -79,7 +121,7 @@ async function generateComprehensiveTestCases(acceptanceCriteria, options = {}) 
         analysis.positiveScenarios,
         'Positive',
         acceptanceCriteria,
-        { areaPath, assignedTo, state }
+        { areaPath, assignedTo, state, model }
       );
       allTestCases.push(...positiveTests);
       console.log(`   ✓ Generated ${positiveTests.filter(t => t.workItemType === 'Test Case').length} Positive scenarios`);
@@ -92,7 +134,7 @@ async function generateComprehensiveTestCases(acceptanceCriteria, options = {}) 
         analysis.negativeScenarios,
         'Negative',
         acceptanceCriteria,
-        { areaPath, assignedTo, state }
+        { areaPath, assignedTo, state, model }
       );
       allTestCases.push(...negativeTests);
       console.log(`   ✗ Generated ${negativeTests.filter(t => t.workItemType === 'Test Case').length} Negative scenarios`);
@@ -105,7 +147,7 @@ async function generateComprehensiveTestCases(acceptanceCriteria, options = {}) 
         analysis.boundaryScenarios,
         'Boundary',
         acceptanceCriteria,
-        { areaPath, assignedTo, state }
+        { areaPath, assignedTo, state, model }
       );
       allTestCases.push(...boundaryTests);
       console.log(`   ⚡ Generated ${boundaryTests.filter(t => t.workItemType === 'Test Case').length} Boundary scenarios`);
@@ -118,7 +160,7 @@ async function generateComprehensiveTestCases(acceptanceCriteria, options = {}) 
         analysis.edgeCases,
         'Edge',
         acceptanceCriteria,
-        { areaPath, assignedTo, state }
+        { areaPath, assignedTo, state, model }
       );
       allTestCases.push(...edgeTests);
       console.log(`   🔍 Generated ${edgeTests.filter(t => t.workItemType === 'Test Case').length} Edge Case scenarios`);
@@ -148,7 +190,7 @@ async function generateComprehensiveTestCases(acceptanceCriteria, options = {}) 
   }
 }
 
-async function performDeepAnalysis(acceptanceCriteria) {
+async function performDeepAnalysis(acceptanceCriteria, model) {
   const prompt = `You are an expert QA analyst. Analyze this acceptance criteria THOROUGHLY and identify ALL possible test scenarios.
 
 READ EVERY SINGLE WORD CAREFULLY:
@@ -209,7 +251,7 @@ IMPORTANT:
           content: prompt
         }
       ],
-      { temperature: 0.4, maxTokens: 4000 }
+      { temperature: 0.4, maxTokens: 4000, model }
     );
 
     console.log('\n📄 Raw Analysis Response (first 500 chars):', response.substring(0, 500));
@@ -344,12 +386,12 @@ function extractScenariosManually(acceptanceCriteria) {
 }
 
 async function generateTestCasesFromScenarios(scenarios, scenarioType, acceptanceCriteria, options) {
-  const { areaPath, assignedTo, state } = options;
+  const { areaPath, assignedTo, state, model } = options;
   const allTestCases = [];
 
   for (const scenario of scenarios) {
     try {
-      const steps = await generateStepsForScenario(scenario, scenarioType, acceptanceCriteria);
+      const steps = await generateStepsForScenario(scenario, scenarioType, acceptanceCriteria, model);
       
       allTestCases.push({
         id: '',
@@ -452,7 +494,7 @@ async function generateTestCasesFromScenarios(scenarios, scenarioType, acceptanc
   return allTestCases;
 }
 
-async function generateStepsForScenario(scenario, scenarioType, acceptanceCriteria) {
+async function generateStepsForScenario(scenario, scenarioType, acceptanceCriteria, model) {
   const prompt = `Generate detailed test steps for this specific test case:
 
 TEST CASE: "${scenario}"
@@ -486,7 +528,7 @@ Return ONLY this JSON array (no markdown, no explanation):
           content: prompt
         }
       ],
-      { temperature: 0.5, maxTokens: 2000 }
+      { temperature: 0.5, maxTokens: 2000, model }
     );
 
     const cleaned = cleanJsonResponse(response);
@@ -707,7 +749,8 @@ async function generateTestCasesWithGroq(acceptanceCriteria, options = {}) {
     platforms = ['Web'],
     areaPath = 'Subscription/Billing/Data',
     assignedTo = 'Unassigned',
-    state = 'New'
+    state = 'New',
+    model
   } = options;
 
   console.log('═══════════════════════════════════════════════════════════');
@@ -720,7 +763,7 @@ async function generateTestCasesWithGroq(acceptanceCriteria, options = {}) {
   console.log('═══════════════════════════════════════════════════════════');
 
   try {
-    const titles = await generateTitlesForType(acceptanceCriteria, scenarioType, numberOfScenarios, platforms);
+    const titles = await generateTitlesForType(acceptanceCriteria, scenarioType, numberOfScenarios, platforms, model);
     
     if (!titles || titles.length === 0) {
       throw new Error('Failed to generate test case titles');
@@ -734,7 +777,7 @@ async function generateTestCasesWithGroq(acceptanceCriteria, options = {}) {
       const title = titles[i];
       console.log(`   ${i + 1}. ${title.substring(0, 60)}...`);
       
-      const steps = await generateStepsForScenario(title, scenarioType, acceptanceCriteria);
+      const steps = await generateStepsForScenario(title, scenarioType, acceptanceCriteria, model);
       const limitedSteps = steps.slice(0, numberOfSteps);
       
       while (limitedSteps.length < numberOfSteps) {
@@ -786,7 +829,7 @@ async function generateTestCasesWithGroq(acceptanceCriteria, options = {}) {
   }
 }
 
-async function generateTitlesForType(acceptanceCriteria, scenarioType, count, platforms) {
+async function generateTitlesForType(acceptanceCriteria, scenarioType, count, platforms, model) {
   const typeDescriptions = {
     'Positive': 'successful/valid/working scenarios where everything works as expected',
     'Negative': 'error handling/invalid input/failure scenarios where the system should reject or handle errors',
@@ -824,7 +867,7 @@ Return ONLY a JSON array of strings:
           content: prompt
         }
       ],
-      { temperature: 0.6, maxTokens: 2000 }
+      { temperature: 0.6, maxTokens: 2000, model }
     );
 
     const cleaned = cleanJsonResponse(response);
@@ -998,18 +1041,21 @@ function getRateLimitStatus() {
 // ═══════════════════════════════════════════════════════════
 
 const GROQ_STATUS_CACHE_MS = 30000;
-let groqStatusCache = { checkedAt: 0, result: null };
+// Status cache is keyed by model id — each model is pinged independently.
+let groqStatusCache = {};
 
 async function checkGroqConnection(options = {}) {
-  const { force = false } = options;
+  const { force = false, model: requestedModel } = options;
+  const model = requestedModel || getSupportedModels().defaultModel;
   const now = Date.now();
+  const cached = groqStatusCache[model];
 
-  if (!force && groqStatusCache.result && now - groqStatusCache.checkedAt < GROQ_STATUS_CACHE_MS) {
-    return groqStatusCache.result;
+  if (!force && cached && now - cached.checkedAt < GROQ_STATUS_CACHE_MS) {
+    return cached.result;
   }
 
   if (!process.env.GROQ_API_KEY) {
-    return cacheAndReturn({
+    return cacheAndReturn(model, {
       connected: false,
       reason: 'missing_key',
       message: 'GROQ_API_KEY is not configured on the server.',
@@ -1029,11 +1075,11 @@ async function checkGroqConnection(options = {}) {
     rateLimiter.minuteRequests = Math.max(0, rateLimiter.minuteRequests - 1);
     rateLimiter.dayRequests = Math.max(0, rateLimiter.dayRequests - 1);
   } catch (limitError) {
-    return cacheAndReturn({
+    return cacheAndReturn(model, {
       connected: true,
       reason: 'rate_limited',
       message: limitError.message,
-      model: GROQ_MODEL,
+      model,
       latencyMs: 0,
       rateLimited: true,
       checkedAt: new Date().toISOString(),
@@ -1047,16 +1093,16 @@ async function checkGroqConnection(options = {}) {
     );
     const ping = groq.chat.completions.create({
       messages: [{ role: 'user', content: 'Reply with the single word: ok' }],
-      model: GROQ_MODEL,
+      model,
       temperature: 0,
       max_tokens: 5,
     });
     const response = await Promise.race([ping, timeout]);
-    return cacheAndReturn({
+    return cacheAndReturn(model, {
       connected: true,
       reason: 'ok',
       message: 'Groq AI is connected and responding.',
-      model: response?.model || GROQ_MODEL,
+      model: response?.model || model,
       latencyMs: Date.now() - started,
       rateLimited: false,
       checkedAt: new Date().toISOString(),
@@ -1066,9 +1112,9 @@ async function checkGroqConnection(options = {}) {
     const isRateLimit = /rate limit|429|rate_limit/i.test(msg);
     const isBadModel = /model_not_found|does not exist|model.+not.+found|404/i.test(msg);
     const friendly = isBadModel
-      ? `Groq rejected the model "${GROQ_MODEL}" (retired or no access). Set a valid GROQ_MODEL env var — see https://console.groq.com/docs/models. Details: ${msg}`
+      ? `Groq rejected the model "${model}" (retired or no access). Set a valid GROQ_MODEL env var — see https://console.groq.com/docs/models. Details: ${msg}`
       : `Groq AI is unreachable: ${msg}`;
-    return cacheAndReturn({
+    return cacheAndReturn(model, {
       connected: isRateLimit, // key works, quota exhausted — generation fallbacks can still run
       reason: isRateLimit ? 'rate_limited' : 'unreachable',
       message: isRateLimit ? msg : friendly,
@@ -1080,14 +1126,134 @@ async function checkGroqConnection(options = {}) {
   }
 }
 
-function cacheAndReturn(result) {
-  groqStatusCache = { checkedAt: Date.now(), result };
+function cacheAndReturn(model, result) {
+  groqStatusCache[model] = { checkedAt: Date.now(), result };
   return result;
+}
+
+// ═══════════════════════════════════════════════════════════
+// AI CHAT — multimodal-capable conversation helper.
+// `messages` use OpenAI content-parts; the caller builds them.
+// ═══════════════════════════════════════════════════════════
+
+async function chatWithGroq(messages, options = {}) {
+  const { model: requestedModel, temperature = 0.5, maxTokens = 4000 } = options;
+  const model = resolveModel(requestedModel);
+  rateLimiter.checkLimit();
+
+  const completion = await groq.chat.completions.create({
+    messages,
+    model,
+    temperature,
+    max_tokens: Math.min(maxTokens, maxOutputFor(model)),
+  });
+
+  return {
+    model,
+    content: completion.choices[0]?.message?.content || '',
+  };
+}
+
+// Validate an incoming chat image data URL. Returns approximate byte size.
+function validateChatImage(dataUrl) {
+  if (typeof dataUrl !== 'string') {
+    throw new Error('Image must be a data URL string.');
+  }
+  const match = dataUrl.match(/^data:(image\/(png|jpe?g|gif|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) {
+    throw new Error('Image must be a PNG, JPEG, GIF or WebP data URL.');
+  }
+  const approxBytes = Math.floor((match[3].length * 3) / 4);
+  const MAX_BYTES = 6 * 1024 * 1024;
+  if (approxBytes > MAX_BYTES) {
+    throw new Error('Image is too large. Maximum size is 6 MB.');
+  }
+  return { mime: match[1], approxBytes };
+}
+
+// Extract a testcases-json fenced block from free-form model output.
+// Returns a validated [{ title, scenarioType, steps: [{action, expected}] }]
+// array, or null when the model produced plain prose.
+function extractTestCasesJson(text) {
+  if (!text) return null;
+  const fence =
+    text.match(/```testcases-json\s*([\s\S]*?)\s*```/i) ||
+    text.match(/```json\s*([\s\S]*?)\s*```/i);
+  if (!fence) return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(fence[1].trim());
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) return null;
+  const cleaned = [];
+  for (const item of parsed) {
+    if (!item || typeof item.title !== 'string' || !Array.isArray(item.steps)) continue;
+    const steps = item.steps
+      .filter((s) => s && (s.action || s.expected))
+      .map((s) => ({
+        action: String(s.action || 'Perform the test action.'),
+        expected: String(s.expected || 'Verify the expected outcome.'),
+      }));
+    if (steps.length === 0) continue;
+    const allowed = ['Positive', 'Negative', 'Boundary', 'Edge'];
+    const scenarioType = allowed.includes(item.scenarioType) ? item.scenarioType : 'Positive';
+    cleaned.push({ title: ensureVerifyPrefix(item.title), scenarioType, steps });
+  }
+  return cleaned.length > 0 ? cleaned : null;
+}
+
+// Format parsed chat cases into the app's flat row shape
+// (header row + step rows — identical to generated test cases).
+function formatChatTestCases(parsed, meta = {}) {
+  const { areaPath = '', assignedTo = '', state = '', priority = '' } = meta;
+  const rows = [];
+  for (const tc of parsed) {
+    rows.push({
+      id: '',
+      workItemType: 'Test Case',
+      title: tc.title,
+      testStep: '',
+      stepAction: '',
+      stepExpected: '',
+      areaPath,
+      assignedTo,
+      state,
+      scenarioType: tc.scenarioType,
+      ...(priority ? { priority } : {}),
+    });
+    tc.steps.forEach((step, i) => {
+      rows.push({
+        id: '',
+        workItemType: '',
+        title: '',
+        testStep: String(i + 1),
+        stepAction: step.action,
+        stepExpected: step.expected,
+        areaPath,
+        assignedTo,
+        state,
+        scenarioType: tc.scenarioType,
+        ...(priority ? { priority } : {}),
+      });
+    });
+  }
+  return rows;
 }
 
 module.exports = { 
   generateTestCasesWithGroq,
   generateComprehensiveTestCases,
   getRateLimitStatus,
-  checkGroqConnection
+  checkGroqConnection,
+  chatWithGroq,
+  validateChatImage,
+  extractTestCasesJson,
+  formatChatTestCases,
+  getSupportedModels,
+  resolveModel,
+  modelSupportsVision,
+  maxOutputFor,
+  SUPPORTED_MODELS,
 };

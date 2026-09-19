@@ -9,11 +9,19 @@ const {
   getStatistics,
   deleteAllTestCases,
   getRateLimitStatus,
-  getGroqStatus
+  getGroqStatus,
+  getSupportedModels,
+  chatWithAI
 } = require('../controllers/testCaseController');
 
 // Generate test cases with AI
 router.post('/generate', generateTestCases);
+
+// AI chat (criteria-aware or solo, optional image)
+router.post('/chat', chatWithAI);
+
+// Supported AI models — MUST be before /:id route
+router.get('/models', getSupportedModels);
 
 // Groq AI connection status — MUST be before /:id route
 router.get('/groq-status', getGroqStatus);

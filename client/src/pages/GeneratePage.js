@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import {
   FaFileCsv,
   FaFileCode,
@@ -12,19 +12,45 @@ import {
 import TestCaseForm from '../components/TestCaseForm';
 import TestCaseList from '../components/TestCaseList';
 import Statistics from '../components/Statistics';
+import ChatBox from '../components/ChatBox';
 
 function GeneratePage({
   testCases,
   stats,
   loading,
   groqStatus,
+  model,
+  models,
+  onModelChange,
   onGenerate,
   onDelete,
   onExport,
   onRetryGroq,
+  onChatTestCases,
+  notify,
 }) {
+  // Acceptance criteria lives here so both the form and the AI chat
+  // read and write the same text.
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState('');
+  const metaRef = useRef({});
+
   const scenarios = testCases.filter((tc) => tc.workItemType === 'Test Case').length;
   const types = new Set(testCases.map((tc) => tc.scenarioType).filter(Boolean)).size;
+
+  const handleInsertCriteria = (text, insertMode) => {
+    if (!text) return;
+    setAcceptanceCriteria((prev) => {
+      if (insertMode === 'replace' || !prev) return text;
+      return `${prev}\n\n${text}`;
+    });
+    if (notify) {
+      notify(
+        insertMode === 'replace'
+          ? 'AI output replaced the Acceptance Criteria.'
+          : 'AI output appended to the Acceptance Criteria.'
+      );
+    }
+  };
 
   return (
     <>
@@ -34,6 +60,14 @@ function GeneratePage({
           loading={loading}
           groqStatus={groqStatus}
           onRetryGroq={onRetryGroq}
+          model={model}
+          models={models}
+          onModelChange={onModelChange}
+          acceptanceCriteria={acceptanceCriteria}
+          onAcceptanceChange={setAcceptanceCriteria}
+          onMetaChange={(meta) => {
+            metaRef.current = meta;
+          }}
         />
 
         <aside className="gen-rail" aria-label="Guidance">
@@ -92,6 +126,17 @@ function GeneratePage({
           </div>
         </aside>
       </div>
+
+      <ChatBox
+        criteria={acceptanceCriteria}
+        meta={metaRef.current}
+        model={model}
+        models={models}
+        onModelChange={onModelChange}
+        aiReady={groqStatus?.state === 'connected'}
+        onInsertCriteria={handleInsertCriteria}
+        onTestCasesGenerated={onChatTestCases}
+      />
 
       {testCases.length > 0 && (
         <div className="card export-bar">

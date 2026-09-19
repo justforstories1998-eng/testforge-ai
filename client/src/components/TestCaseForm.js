@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FaCheckCircle, 
   FaExclamationCircle, 
@@ -13,13 +13,24 @@ import {
 } from 'react-icons/fa';
 import './TestCaseForm.css';
 import GroqStatus from './GroqStatus';
+import ModelSelector from './ModelSelector';
 
-function TestCaseForm({ onGenerate, loading, groqStatus, onRetryGroq }) {
+function TestCaseForm({
+  onGenerate,
+  loading,
+  groqStatus,
+  onRetryGroq,
+  model,
+  models,
+  onModelChange,
+  acceptanceCriteria,
+  onAcceptanceChange,
+  onMetaChange,
+}) {
   const aiReady = groqStatus?.state === 'connected';
   const aiChecking = !groqStatus || groqStatus.state === 'checking';
   const aiWaking = groqStatus?.state === 'waking';
   const [formData, setFormData] = useState({
-    acceptanceCriteria: '',
     scenarioType: 'Positive',
     priority: 'High',
     numberOfScenarios: 5,
@@ -36,9 +47,26 @@ function TestCaseForm({ onGenerate, loading, groqStatus, onRetryGroq }) {
   // Disable specific inputs when "Comprehensive" mode is selected
   const isComprehensive = formData.scenarioType === 'All';
 
+  // Keep the parent (chat + submit) in sync with live criteria + meta.
+  useEffect(() => {
+    if (onMetaChange) {
+      onMetaChange({
+        areaPath: formData.areaPath,
+        assignedTo: formData.assignedTo,
+        state: formData.state,
+        priority: formData.priority,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.areaPath, formData.assignedTo, formData.state, formData.priority]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    if (name === 'acceptanceCriteria') {
+      if (onAcceptanceChange) onAcceptanceChange(value);
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
     if (error) setError('');
   };
 
@@ -58,13 +86,15 @@ function TestCaseForm({ onGenerate, loading, groqStatus, onRetryGroq }) {
       setError('Groq AI is not connected. Please restore the connection before generating.');
       return;
     }
-    if (formData.acceptanceCriteria.trim().length < 10) {
+    if ((acceptanceCriteria || '').trim().length < 10) {
       setError('Detailed acceptance criteria is required for high-quality AI analysis.');
       return;
     }
 
     const submissionData = {
       ...formData,
+      acceptanceCriteria,
+      model,
       numberOfScenarios: isComprehensive ? 'auto' : formData.numberOfScenarios,
       numberOfSteps: isComprehensive ? 'auto' : formData.numberOfSteps
     };
@@ -100,6 +130,16 @@ function TestCaseForm({ onGenerate, loading, groqStatus, onRetryGroq }) {
         {/* Groq AI connection — generation is allowed only when connected */}
         <GroqStatus status={groqStatus} onRetry={onRetryGroq} />
 
+        {/* AI Model selection */}
+        <div className="tc-form-group tc-full-width">
+          <ModelSelector
+            models={models}
+            value={model}
+            onChange={onModelChange}
+            disabled={loading}
+          />
+        </div>
+
         <form className="tc-main-form" onSubmit={handleSubmit}>
           
           {/* Acceptance Criteria - Full Width */}
@@ -109,7 +149,7 @@ function TestCaseForm({ onGenerate, loading, groqStatus, onRetryGroq }) {
             </label>
             <textarea
               name="acceptanceCriteria"
-              value={formData.acceptanceCriteria}
+              value={acceptanceCriteria || ''}
               onChange={handleChange}
               placeholder="Paste your requirements here. Detailed input allows the AI to map deeper logic paths..."
               rows="5"

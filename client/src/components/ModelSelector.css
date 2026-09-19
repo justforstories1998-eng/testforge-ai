@@ -1,0 +1,80 @@
+.model-select-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.model-select-label {
+  display: flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.model-select-icon {
+  color: var(--accent);
+  margin-right: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.model-select-field {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.model-select-field select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.72rem 2.4rem 0.72rem 0.95rem;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background-color: var(--inset);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23f43f5e' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.9rem center;
+  appearance: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  min-height: 44px;
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+.model-select-field select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.18);
+}
+
+.model-select-field select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.model-vision-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  border: 1px solid var(--border-accent);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.model-select-compact .model-select-field select {
+  padding: 0.5rem 2.2rem 0.5rem 0.8rem;
+  font-size: 0.82rem;
+  min-height: 38px;
+}
