@@ -3,7 +3,7 @@ import { FaTimes, FaCopy, FaDownload, FaRedo, FaCheck, FaFlask } from 'react-ico
 import { generatePlaywrightSpec, groupScenarios, toSpecFileName } from '../utils/playwrightExporter';
 import './PlaywrightExportModal.css';
 
-function PlaywrightExportModal({ testCases, initialFileName, onClose, onDownloaded }) {
+function PlaywrightExportModal({ testCases, initialFileName, initialCode, aiBadge, onClose, onDownloaded }) {
   const scenarios = useMemo(() => groupScenarios(testCases), [testCases]);
   const totalSteps = useMemo(
     () => scenarios.reduce((n, s) => n + s.steps.length, 0),
@@ -15,7 +15,7 @@ function PlaywrightExportModal({ testCases, initialFileName, onClose, onDownload
   const [fileName, setFileName] = useState(
     initialFileName || toSpecFileName(scenarios[0]?.title)
   );
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(initialCode || '');
   const [copied, setCopied] = useState(false);
 
   const regenerate = (nextBase = baseURL, nextDescribe = describeTitle) => {
@@ -24,11 +24,15 @@ function PlaywrightExportModal({ testCases, initialFileName, onClose, onDownload
     );
   };
 
-  // Generate on open / when source data changes.
+  // AI-provided code wins on open; otherwise generate from rows.
   useEffect(() => {
-    regenerate('/', 'Test-CaseAI — Generated Suite');
+    if (initialCode) {
+      setCode(initialCode);
+    } else {
+      regenerate('/', 'Test-CaseAI — Generated Suite');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [testCases]);
+  }, [testCases, initialCode]);
 
   const ensureSpecExtension = (name) => {
     const clean = (name || '').trim() || 'test-caseai-generated.spec.ts';
@@ -77,8 +81,12 @@ function PlaywrightExportModal({ testCases, initialFileName, onClose, onDownload
             <div>
               <h3>Export as Playwright spec.ts</h3>
               <p>
-                {scenarios.length} scenario{scenarios.length === 1 ? '' : 's'} · {totalSteps} step
-                {totalSteps === 1 ? '' : 's'} · edit the code below, then download
+                {aiBadge || (
+                  <>
+                    {scenarios.length} scenario{scenarios.length === 1 ? '' : 's'} · {totalSteps} step
+                    {totalSteps === 1 ? '' : 's'} · edit the code below, then download
+                  </>
+                )}
               </p>
             </div>
           </div>

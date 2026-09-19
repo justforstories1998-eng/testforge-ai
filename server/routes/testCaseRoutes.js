@@ -11,7 +11,8 @@ const {
   getRateLimitStatus,
   getGroqStatus,
   getSupportedModels,
-  chatWithAI
+  chatWithAI,
+  generateChatSpec
 } = require('../controllers/testCaseController');
 
 // Generate test cases with AI
@@ -19,6 +20,9 @@ router.post('/generate', generateTestCases);
 
 // AI chat (criteria-aware or solo, optional image)
 router.post('/chat', chatWithAI);
+
+// AI Playwright spec: Qwen reads the image, GPT writes the code
+router.post('/chat-spec', generateChatSpec);
 
 // Supported AI models — MUST be before /:id route
 router.get('/models', getSupportedModels);

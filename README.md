@@ -7,7 +7,8 @@ AI-powered test case generator. Paste acceptance criteria, get enterprise-grade 
 - **AI generation** — Groq-powered test scenarios with step-by-step actions and expected results; generation is gated behind a live connection check, and Retry wakes a sleeping free-tier host before re-checking
 - **Model choice** — switch between `openai/gpt-oss-120b` and vision-capable `qwen/qwen3.8-27b` from a dropdown; the selection drives generation, status checks, and chat
 - **Reasoning control** — Off/Low/Medium/High effort for both models (native `reasoning_effort` on gpt-oss; on/off + depth-tuned prompting on qwen, per Groq's API)
-- **AI chat** — assistant under the criteria form with Criteria/Solo modes, Markdown-rendered answers, image attach (paste, drag & drop, picker) on the vision model, stop/retry/clear, and one-click insert back into Acceptance Criteria; test cases it generates load straight into Session Results with CSV/Markdown/spec.ts export right in the chat- **Playwright export** — runnable `.spec.ts` output with resilient locators, per-line `WHY` explanations, and an in-app preview/edit modal before download
+- **AI chat** — assistant under the criteria form with Criteria/Solo modes, Markdown-rendered answers, image attach (paste, drag & drop, picker) on the vision model, stop/retry/clear, and one-click insert back into Acceptance Criteria; test cases it generates load straight into Session Results with CSV/Markdown/spec.ts export right in the chat
+- **AI Playwright specs** — split pipeline for image-grounded specs: Qwen reads the screenshot, GPT writes the code (same house conventions as the built-in exporter), previewed in the editable spec modal- **Playwright export** — runnable `.spec.ts` output with resilient locators, per-line `WHY` explanations, and an in-app preview/edit modal before download
 - **More exports** — CSV, JSON, Markdown
 - **Repository** — searchable history of all generations, per-row delete, clear-all
 - **Insights** — scenario-type and priority distribution dashboard
@@ -73,6 +74,7 @@ npm run test-groq
 |---|---|---|
 | POST | `/api/testcases/generate` | Generate scenarios from acceptance criteria (`model`, `reasoning` optional) |
 | POST | `/api/testcases/chat` | Chat with the AI (`mode`: criteria/solo, `model`, `reasoning`, optional image) |
+| POST | `/api/testcases/chat-spec` | AI Playwright spec from an image (Qwen reads, GPT writes; `reasoning` optional) |
 | GET | `/api/testcases/models` | Supported models + default (`id`, `label`, `vision`) |
 | GET | `/api/testcases` | List all generated rows |
 | GET | `/api/testcases/groq-status` | AI connection status (`connected`, `model`, `latencyMs`) |

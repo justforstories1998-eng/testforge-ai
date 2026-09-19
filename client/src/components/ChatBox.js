@@ -56,6 +56,7 @@ function ChatBox({
   onInsertCriteria,
   onTestCasesGenerated,
   onExportChat,
+  onGenerateAiSpec,
 }) {
   const [mode, setMode] = useState('criteria');
   const [messages, setMessages] = useState([]);
@@ -63,6 +64,7 @@ function ChatBox({
   const [image, setImage] = useState(null); // { dataUrl, name }
   const [sending, setSending] = useState(false);
   const [sendingImage, setSendingImage] = useState(false);
+  const [specLoadingId, setSpecLoadingId] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
 
@@ -231,6 +233,8 @@ function ChatBox({
           testInfo,
           rows: testInfo ? res.testCases : null,
           model: res.model || model,
+          fromImage: !!img,
+          sourceImage: img?.dataUrl || null,
         });
 
         if (res.truncated) {
@@ -290,6 +294,20 @@ function ChatBox({
     setMessages([]);
     setImage(null);
     setInput('');
+  };
+
+  // AI spec via the split pipeline (Qwen reads the image, GPT writes code).
+  const generateAiSpec = async (msg) => {
+    if (!msg.sourceImage || specLoadingId || sending) return;
+    setSpecLoadingId(msg.id);
+    try {
+      await onGenerateAiSpec({ image: msg.sourceImage, criteria });
+    } catch (err) {
+      pushSystemNote(err?.error || err?.message || 'AI spec generation failed. Please try again.');
+    } finally {
+      setSpecLoadingId(null);
+      stickRef.current = true;
+    }
   };
 
   const downloadTranscript = () => {
@@ -550,6 +568,22 @@ function ChatBox({
                       >
                         <FaFlask /> .spec.ts
                       </button>
+                      {msg.fromImage && msg.sourceImage && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => generateAiSpec(msg)}
+                          disabled={specLoadingId === msg.id || sending || !aiReady}
+                          title="Generate Playwright code with AI — Qwen reads the image, GPT writes the code"
+                        >
+                          {specLoadingId === msg.id ? (
+                            <FaSpinner className="groq-spin" />
+                          ) : (
+                            <FaRobot />
+                          )}
+                          AI code
+                        </button>
+                      )}
                     </span>
                   </div>
                 )}

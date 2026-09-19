@@ -84,6 +84,8 @@ function Shell() {
   const [success, setSuccess] = useState('');
   const [showPwModal, setShowPwModal] = useState(false);
   const [pwExportData, setPwExportData] = useState([]);
+  const [pwSpecCode, setPwSpecCode] = useState(null);
+  const [pwFileName, setPwFileName] = useState(undefined);
   const [groq, setGroq] = useState({ state: 'checking' });
   const [navOpen, setNavOpen] = useState(false);
   const [model, setModel] = useState(DEFAULT_MODEL);
@@ -316,6 +318,8 @@ const fetchAll = useCallback(async () => {
     // Playwright opens the editable preview modal instead of downloading directly
     if (format === 'playwright') {
       setPwExportData(exportData);
+      setPwSpecCode(null);
+      setPwFileName(undefined);
       setShowPwModal(true);
       return;
     }
@@ -371,6 +375,29 @@ const fetchAll = useCallback(async () => {
     }
 
     setSuccess(`Exported ${exportData.length} records as ${format.toUpperCase()}`);
+  };
+
+  const shortModelName = (id) => String(id || '').split('/').pop() || id;
+
+  // AI Playwright spec via the split pipeline (Qwen reads, GPT writes).
+  // Opens the same editable modal, prefilled with the AI-written code.
+  const handleAiSpec = async ({ image, criteria }) => {
+    const res = await axios.post(
+      `${API_URL}/testcases/chat-spec`,
+      { image, criteria: criteria || '', reasoning },
+      { timeout: 180000 }
+    );
+    if (!res.data?.specCode) {
+      throw new Error(res.data?.error || 'AI spec generation produced no code.');
+    }
+    setPwExportData([]);
+    setPwSpecCode(res.data.specCode);
+    setPwFileName(res.data.fileName || undefined);
+    setShowPwModal(true);
+    setSuccess(
+      `AI spec ready — read by ${shortModelName(res.data.reader)} and written by ${shortModelName(res.data.writer)}`
+    );
+    return res.data;
   };
 
   const download = (content, mime, filename) => {
@@ -466,6 +493,7 @@ const fetchAll = useCallback(async () => {
               onRetryGroq={retryGroqConnection}
               onChatTestCases={handleChatTestCases}
               onExportChat={(format, rows) => handleExport(format, rows)}
+              onGenerateAiSpec={handleAiSpec}
               notify={setSuccess}
             />
           )}
@@ -506,6 +534,13 @@ const fetchAll = useCallback(async () => {
       {showPwModal && (
         <PlaywrightExportModal
           testCases={pwExportData}
+          initialFileName={pwFileName}
+          initialCode={pwSpecCode}
+          aiBadge={
+            pwSpecCode
+              ? 'Qwen reads the image · GPT writes the code — edit below, then download'
+              : null
+          }
           onClose={() => setShowPwModal(false)}
           onDownloaded={(scenarios, steps) =>
             setSuccess(`Exported ${scenarios} scenario(s) / ${steps} step(s) as Playwright spec.ts`)

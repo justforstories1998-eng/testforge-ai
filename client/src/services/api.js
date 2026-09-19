@@ -111,6 +111,21 @@ export const chatWithAI = async (payload, { signal } = {}) => {
   }
 };
 
+// Generate a Playwright spec from an image via the split pipeline:
+// Qwen reads the image, GPT writes the code.
+// Payload: { image (data URL), criteria?, reasoning? }
+export const generateAiSpec = async (payload) => {
+  try {
+    const response = await api.post('/testcases/chat-spec', payload, {
+      timeout: 180000,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('AI spec API Error:', error);
+    throw error.response?.data || { message: error.message };
+  }
+};
+
 // Check whether the Groq AI backend is reachable.
 // Used to gate test-case generation. Short timeout so an offline
 // backend fails fast instead of hanging the UI.

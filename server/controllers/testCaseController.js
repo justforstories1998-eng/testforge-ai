@@ -282,6 +282,139 @@ Rules: every title starts with "Verify"; 3-4 concrete steps per scenario; AT MOS
 For criteria/user-story requests, answer in clear Markdown the user can insert back into the form.`;
 }
 
+// @desc    Generate a Playwright spec from an image: Qwen reads, GPT writes
+// @route   POST /api/testcases/chat-spec
+// @access  Public
+exports.generateChatSpec = async (req, res) => {
+  try {
+    const { image = null, criteria = '', reasoning: requestedReasoning } = req.body || {};
+
+    if (!image) {
+      return res.status(400).json({ success: false, error: 'An image is required to generate an AI spec.' });
+    }
+    try {
+      validateChatImage(image);
+    } catch (imgError) {
+      return res.status(400).json({ success: false, error: imgError.message });
+    }
+
+    // Fixed pair: vision model reads, code model writes.
+    const READER_ID = 'qwen/qwen3.8-27b';
+    const WRITER_ID = 'openai/gpt-oss-120b';
+    let reader;
+    let writer;
+    try {
+      reader = resolveModel(READER_ID);
+      writer = resolveModel(WRITER_ID);
+    } catch (modelError) {
+      return res.status(400).json({ success: false, error: modelError.message });
+    }
+
+    let reasoning;
+    try {
+      reasoning = resolveReasoning(requestedReasoning);
+    } catch (reasoningError) {
+      return res.status(400).json({ success: false, error: reasoningError.message });
+    }
+
+    if (!process.env.GROQ_API_KEY) {
+      return res.status(503).json({
+        success: false,
+        error: 'Groq AI is not connected (API key missing).',
+        isConnectionError: true,
+      });
+    }
+
+    // Pass 1 — Qwen: exhaustive visual analysis (always deep for accuracy).
+    let analysis;
+    try {
+      analysis = await analyzeImageWithGroq(image, { model: reader });
+    } catch (analysisError) {
+      if (/rate limit|429|rate_limit|request too large|quota/i.test(analysisError.message || '')) {
+        return res.status(429).json({ success: false, error: analysisError.message, isRateLimitError: true });
+      }
+      throw analysisError;
+    }
+    if (!analysis || !analysis.trim()) {
+      return res.status(502).json({ success: false, error: 'The image could not be analysed. Try a clearer screenshot.' });
+    }
+
+    // Pass 2 — GPT: write the Playwright spec from the analysis.
+    let written;
+    try {
+      written = await chatWithGroq(
+        [
+          { role: 'system', content: SPEC_WRITER_SYSTEM },
+          { role: 'user', content: buildSpecUserPrompt(criteria, analysis) },
+        ],
+        { model: writer, temperature: 0.3, maxTokens: 6000, reasoning }
+      );
+    } catch (writerError) {
+      if (/rate limit|429|rate_limit|request too large|quota/i.test(writerError.message || '')) {
+        return res.status(429).json({ success: false, error: writerError.message, isRateLimitError: true });
+      }
+      throw writerError;
+    }
+
+    const specCode = extractTypescript(written.content);
+    if (!specCode || !specCode.includes('@playwright/test') || !specCode.includes('test(')) {
+      return res.status(502).json({
+        success: false,
+        error: 'The AI did not return a valid Playwright spec. Please try again.',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      reader,
+      writer,
+      reasoning,
+      specCode,
+      fileName: 'testcaseai-ai-generated.spec.ts',
+    });
+  } catch (error) {
+    console.error('❌ Chat-spec error:', error);
+    res.status(500).json({ success: false, error: 'AI spec generation failed. Please try again.', details: error.message });
+  }
+};
+
+const SPEC_WRITER_SYSTEM = `You are an expert Playwright test engineer writing a complete, runnable TypeScript spec file.
+House conventions you MUST follow:
+- Start with: import { test, expect, type Page } from '@playwright/test';
+- Include these exact resilient helpers (label -> placeholder -> role fallbacks):
+async function fillField(page: Page, name: RegExp, value: string) {
+  const field = page.getByLabel(name).or(page.getByPlaceholder(name)).or(page.getByRole('textbox', { name }));
+  await field.first().fill(value);
+}
+async function clickButton(page: Page, name: RegExp) {
+  const control = page.getByRole('button', { name }).or(page.getByRole('link', { name })).or(page.getByText(name));
+  await control.first().click();
+}
+async function expectTextVisible(page: Page, pattern: RegExp) {
+  await expect(page.getByText(pattern).first()).toBeVisible();
+}
+- Wrap the suite in test.describe('...', ...). One test() per scenario, test.step() per step.
+- Every step must be REAL executable code (goto/fill/click/select/expect) derived from the visual analysis labels — no TODO-only stubs. Prefer getByRole/getByLabel locators.
+- Keep assertions meaningful (visible text, URLs, error absence). Output ONLY the file inside one \`\`\`typescript fence, plus at most two short sentences of prose outside it.`;
+
+function buildSpecUserPrompt(criteria, analysis) {
+  const context = criteria && String(criteria).trim()
+    ? `Project context (acceptance criteria):\n"""\n${String(criteria).trim().slice(0, 4000)}\n"""\n\n`
+    : '';
+  return `${context}Authoritative visual analysis of the target screen (treat quoted labels as exact):\n${analysis}\n\nWrite the complete Playwright spec covering the scenarios visible in this screen (happy path plus the most important negative/error case). Use '/login' style placeholder paths only where the real route is unknown.`;
+}
+
+// Extract the first ```typescript (or ```ts) fenced block.
+function extractTypescript(text) {
+  if (!text) return null;
+  const fence =
+    text.match(/```typescript\s*([\s\S]*?)(?:\s*```|$)/i) ||
+    text.match(/```ts\s*([\s\S]*?)(?:\s*```|$)/i);
+  if (!fence) return null;
+  const code = fence[1].trim();
+  return code.length > 50 ? code : null;
+}
+
 // @desc    Generate test cases using AI
 // @route   POST /api/testcases/generate
 // @access  Public
