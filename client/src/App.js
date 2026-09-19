@@ -89,7 +89,6 @@ function Shell() {
   const [model, setModel] = useState(DEFAULT_MODEL);
   const [models, setModels] = useState(SUPPORTED_MODELS_FALLBACK);
   const [reasoning, setReasoning] = useState('medium');
-  const [chatExport, setChatExport] = useState(null);
   // Ref mirror so stable callbacks always read the selected model.
   const modelRef = useRef(DEFAULT_MODEL);
   useEffect(() => {
@@ -268,23 +267,6 @@ const fetchAll = useCallback(async () => {
       if (!chatTestCases?.length) return;
       const append = !!info.append;
       setTestCases((prev) => (append ? [...prev, ...chatTestCases] : chatTestCases));
-      setChatExport((prev) => {
-        if (append && prev?.testCases?.length) {
-          const merged = [...prev.testCases, ...chatTestCases];
-          return {
-            testCases: merged,
-            scenarios: (prev.scenarios || 0) + (info.scenarios || 0),
-            count: merged.length,
-            model: info.model || modelRef.current,
-          };
-        }
-        return {
-          testCases: chatTestCases,
-          scenarios: info.scenarios || 0,
-          count: info.count || chatTestCases.length,
-          model: info.model || modelRef.current,
-        };
-      });
       await fetchAll();
       const usedModel = info.model || modelRef.current;
       const found = models.find((m) => m.id === usedModel);
@@ -295,23 +277,6 @@ const fetchAll = useCallback(async () => {
     },
     [fetchAll, models]
   );
-
-  // Export the chat-generated rows via the standard export pipeline.
-  const handleExportChat = useCallback(
-    (format) => {
-      if (!chatExport?.testCases?.length) {
-        setError('No chat-generated test cases to export yet.');
-        return;
-      }
-      handleExport(format, chatExport.testCases);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [chatExport]
-  );
-
-  const handleClearChat = useCallback(() => {
-    setChatExport(null);
-  }, []);
 
   // Delete a specific row
   const handleDelete = async (index) => {
@@ -500,9 +465,7 @@ const fetchAll = useCallback(async () => {
               onExport={handleExport}
               onRetryGroq={retryGroqConnection}
               onChatTestCases={handleChatTestCases}
-              chatExport={chatExport}
-              onExportChat={handleExportChat}
-              onClearChat={handleClearChat}
+              onExportChat={(format, rows) => handleExport(format, rows)}
               notify={setSuccess}
             />
           )}

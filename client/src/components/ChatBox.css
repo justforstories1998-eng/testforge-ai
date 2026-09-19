@@ -536,26 +536,25 @@
   color: var(--text);
 }
 
-/* ---------- Export bar ---------- */
-.chat-export-bar {
+/* ---------- In-message result card with downloads ---------- */
+.chat-result-card {
+  margin-top: 0.6rem;
+  padding: 0.65rem 0.75rem;
+  background: var(--inset);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--r-sm);
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  padding: 0.7rem 1.4rem 1rem;
-  border-top: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.22);
+  flex-direction: column;
+  gap: 0.55rem;
 }
 
-.chat-export-label {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--rose);
+.chat-result-card .chat-testinfo {
+  margin: 0;
 }
 
-.chat-export-actions {
+.chat-result-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.45rem;
   flex-wrap: wrap;
 }
 

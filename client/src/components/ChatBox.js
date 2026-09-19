@@ -18,6 +18,7 @@ import {
   FaFileCsv,
   FaMarkdown,
   FaFlask,
+  FaDownload,
 } from 'react-icons/fa';
 import ModelSelector from './ModelSelector';
 import ReasoningSelector from './ReasoningSelector';
@@ -54,9 +55,7 @@ function ChatBox({
   aiReady,
   onInsertCriteria,
   onTestCasesGenerated,
-  chatExport,
   onExportChat,
-  onClearChat,
 }) {
   const [mode, setMode] = useState('criteria');
   const [messages, setMessages] = useState([]);
@@ -194,6 +193,8 @@ function ChatBox({
           role: 'assistant',
           content: res.reply || '(empty response)',
           testInfo,
+          rows: testInfo ? res.testCases : null,
+          model: res.model || model,
         });
 
         if (res.truncated) {
@@ -252,7 +253,48 @@ function ChatBox({
     setMessages([]);
     setImage(null);
     setInput('');
-    if (onClearChat) onClearChat();
+  };
+
+  const downloadTranscript = () => {
+    if (messages.length === 0 || sending) return;
+    const lines = [
+      '# Test-CaseAI Chat Transcript',
+      '',
+      `- Exported: ${new Date().toLocaleString()}`,
+      `- Models used: ${[...new Set(messages.filter((m) => m.model).map((m) => m.model))].join(', ') || model}`,
+      '',
+      '---',
+      '',
+    ];
+    for (const msg of messages) {
+      if (msg.role === 'system') {
+        lines.push(`> *${stripSummaryLine(msg.content)}*`, '');
+      } else if (msg.role === 'user') {
+        lines.push(`## User · ${formatTime(msg.ts)}`, '');
+        if (msg.imageThumb) lines.push(`[image attached: ${msg.imageName || 'image'}]`, '');
+        if (msg.content) lines.push(msg.content, '');
+      } else {
+        lines.push(`## Assistant · ${formatTime(msg.ts)}${msg.model ? ` · ${msg.model}` : ''}`, '');
+        if (msg.error) {
+          lines.push(`**Error:** ${msg.error}`, '');
+        } else {
+          if (msg.content) lines.push(stripSummaryLine(msg.content), '');
+          if (msg.testInfo) {
+            lines.push(`> Generated ${msg.testInfo.scenarios} scenario(s) (${msg.testInfo.count} rows).`, '');
+          }
+        }
+      }
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
+    a.href = url;
+    a.download = `testcaseai-chat-${stamp}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const switchMode = (next) => {
@@ -358,6 +400,16 @@ function ChatBox({
           <button
             type="button"
             className="icon-btn"
+            onClick={downloadTranscript}
+            disabled={sending || messages.length === 0}
+            title="Download conversation (.md)"
+            aria-label="Download conversation"
+          >
+            <FaDownload />
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
             onClick={clearConversation}
             disabled={sending || (messages.length === 0 && !image)}
             title="Clear conversation"
@@ -434,7 +486,37 @@ function ChatBox({
                     </div>
                   )
                 )}
-                {msg.testInfo && (
+                {msg.testInfo && msg.rows?.length > 0 && (
+                  <div className="chat-result-card">
+                    <p className="chat-testinfo">
+                      ✅ {msg.testInfo.scenarios} scenario(s) · {msg.testInfo.count} rows — download:
+                    </p>
+                    <span className="chat-result-actions">
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => onExportChat('csv', msg.rows)}
+                      >
+                        <FaFileCsv /> CSV
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => onExportChat('markdown', msg.rows)}
+                      >
+                        <FaMarkdown /> Markdown
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => onExportChat('playwright', msg.rows)}
+                      >
+                        <FaFlask /> .spec.ts
+                      </button>
+                    </span>
+                  </div>
+                )}
+                {msg.testInfo && !msg.rows?.length && (
                   <p className="chat-testinfo">
                     ✅ {msg.testInfo.scenarios} scenario(s) loaded into Session Results below.
                   </p>
@@ -598,25 +680,6 @@ function ChatBox({
         Enter send · Shift+Enter newline · Esc stop · paste / drag &amp; drop images
         {visionOn ? '' : ' (images need the vision model)'}
       </p>
-
-      {chatExport?.testCases?.length > 0 && (
-        <div className="chat-export-bar">
-          <span className="chat-export-label">
-            ✅ {chatExport.scenarios || 0} scenario(s) generated — export:
-          </span>
-          <span className="chat-export-actions">
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => onExportChat('csv')}>
-              <FaFileCsv /> CSV
-            </button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => onExportChat('markdown')}>
-              <FaMarkdown /> Markdown
-            </button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => onExportChat('playwright')}>
-              <FaFlask /> .spec.ts
-            </button>
-          </span>
-        </div>
-      )}
 
       {dragOver && (
         <div className="chat-drop-veil" aria-hidden="true">

@@ -29,9 +29,7 @@ function GeneratePage({
   onExport,
   onRetryGroq,
   onChatTestCases,
-  chatExport,
   onExportChat,
-  onClearChat,
   notify,
 }) {
   // Acceptance criteria lives here so both the form and the AI chat
@@ -145,9 +143,7 @@ function GeneratePage({
         aiReady={groqStatus?.state === 'connected'}
         onInsertCriteria={handleInsertCriteria}
         onTestCasesGenerated={onChatTestCases}
-        chatExport={chatExport}
         onExportChat={onExportChat}
-        onClearChat={onClearChat}
       />
 
       {testCases.length > 0 && (
