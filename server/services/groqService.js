@@ -1401,12 +1401,52 @@ function formatChatTestCases(parsed, meta = {}) {
   return rows;
 }
 
+// Pass 1 of two-pass vision: exhaustive, grounded description of the image.
+// The caller feeds the result back as authoritative context for pass 2,
+// which is what makes image answers accurate instead of guessy.
+async function analyzeImageWithGroq(imageDataUrl, options = {}) {
+  const { model: requestedModel } = options;
+  const model = resolveModel(requestedModel);
+  if (!modelSupportsVision(model)) {
+    throw new Error(`Model "${model}" does not support images.`);
+  }
+  rateLimiter.checkLimit();
+
+  const prompt = `You are a precise visual analyst. Analyse the attached image EXHAUSTIVELY — this description will ground test-case generation, so completeness beats brevity:
+
+1. Transcribe ALL visible text VERBATIM, in reading order (headings, labels, buttons, placeholders, errors, table contents).
+2. List EVERY interactive control (buttons, inputs, dropdowns, checkboxes, links, toggles) with its exact visible label and apparent state (enabled/disabled, checked, selected, error).
+3. Describe the layout regions, screen purpose, and any data/values shown.
+4. State ambiguities explicitly (e.g. "text too small to read") instead of guessing.
+
+Output structured Markdown under the headings: Visible Text, Controls, Layout & State, Ambiguities.`;
+
+  const completion = await groq.chat.completions.create({
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+        ],
+      },
+    ],
+    model,
+    temperature: 0.2,
+    max_tokens: Math.min(1200, maxOutputFor(model)),
+    ...reasoningRequestParams(model, 'high').apiParams,
+  });
+
+  return completion.choices[0]?.message?.content || '';
+}
+
 module.exports = { 
   generateTestCasesWithGroq,
   generateComprehensiveTestCases,
   getRateLimitStatus,
   checkGroqConnection,
   chatWithGroq,
+  analyzeImageWithGroq,
   validateChatImage,
   extractTestCasesJson,
   formatChatTestCases,

@@ -473,10 +473,29 @@ async function handleChat(req, res) {
         hadImage: !!m.hadImage,
       }));
 
-    const { promptHint } = reasoningRequestParams(model, reasoning);
     const basePrompt = buildChatSystemPrompt(mode, criteria, !!image);
+
+    // Image turns always run deep: verbatim analysis first, answer grounded
+    // in it second. Slower on purpose — accuracy over speed for visuals.
+    let visualAnalysis = '';
+    let effectiveReasoning = reasoning;
+    if (image) {
+      effectiveReasoning = 'high';
+      try {
+        visualAnalysis = await analyzeImageWithGroq(image, model);
+      } catch (analysisError) {
+        console.error('⚠️ Visual analysis pass failed, continuing single-pass:', analysisError.message);
+      }
+    }
+    const { promptHint: effectiveHint } = reasoningRequestParams(model, effectiveReasoning);
+    const imageProtocol = image
+      ? '\n\nIMAGE PROTOCOL: 1) Re-check the attached image against the visual analysis below. 2) Quote exact labels in your answer. 3) Never invent controls or text not present in the analysis.'
+      : '';
     const groqMessages = [
-      { role: 'system', content: promptHint ? `${basePrompt}\n\nStyle: ${promptHint}` : basePrompt },
+      {
+        role: 'system',
+        content: (effectiveHint ? `${basePrompt}\n\nStyle: ${effectiveHint}` : basePrompt) + imageProtocol,
+      },
     ];
     for (const m of cleanHistory) {
       groqMessages.push({
@@ -487,11 +506,14 @@ async function handleChat(req, res) {
       });
     }
     if (image) {
+      const groundedText = visualAnalysis
+        ? `[Authoritative visual analysis of the attached image — treat quoted labels as exact and ground every claim in it:]\n${visualAnalysis}\n\n[User request:]\n${cleanText || 'Analyze this image.'}`
+        : cleanText || 'Analyze this image.';
       groqMessages.push({
         role: 'user',
         content: [
-          { type: 'text', text: cleanText || 'Analyze this image.' },
-          { type: 'image_url', image_url: { url: image } },
+          { type: 'text', text: groundedText },
+          { type: 'image_url', image_url: { url: image, detail: 'high' } },
         ],
       });
     } else {
@@ -507,7 +529,7 @@ async function handleChat(req, res) {
         model,
         temperature: mode === 'solo' ? 0.7 : 0.5,
         max_tokens: Math.min(6000, maxOutputFor(model)),
-        ...reasoningRequestParams(model, reasoning).apiParams,
+        ...reasoningRequestParams(model, effectiveReasoning).apiParams,
       });
       content = response.choices[0]?.message?.content || '';
       finishReason = response.choices[0]?.finish_reason || null;
@@ -545,13 +567,13 @@ async function handleChat(req, res) {
           reply = reply.replace(/```testcases-json[\s\S]*$/i, '').trim();
         }
         return res.status(200).json({
-          success: true, model, reasoning, reply, truncated, testCases: rows, count: rows.length, scenarios: headerRows,
+          success: true, model, reasoning: effectiveReasoning, reply, truncated, testCases: rows, count: rows.length, scenarios: headerRows,
         });
       }
     }
 
     return res.status(200).json({
-      success: true, model, reasoning, reply, truncated, testCases: null, count: 0, scenarios: 0,
+      success: true, model, reasoning: effectiveReasoning, reply, truncated, testCases: null, count: 0, scenarios: 0,
     });
   } catch (error) {
     console.error('❌ Chat error:', error);
@@ -559,8 +581,38 @@ async function handleChat(req, res) {
   }
 }
 
-function buildChatSystemPrompt(mode, criteria, hasImage) {
-  if (mode === 'solo') {
+// Pass 1 of two-pass vision: exhaustive grounded description.
+// Mirrors analyzeImageWithGroq in server/services/groqService.js.
+async function analyzeImageWithGroq(imageDataUrl, model) {
+  const client = getGroqClient();
+  const prompt = `You are a precise visual analyst. Analyse the attached image EXHAUSTIVELY — this description will ground test-case generation, so completeness beats brevity:
+
+1. Transcribe ALL visible text VERBATIM, in reading order (headings, labels, buttons, placeholders, errors, table contents).
+2. List EVERY interactive control (buttons, inputs, dropdowns, checkboxes, links, toggles) with its exact visible label and apparent state (enabled/disabled, checked, selected, error).
+3. Describe the layout regions, screen purpose, and any data/values shown.
+4. State ambiguities explicitly (e.g. "text too small to read") instead of guessing.
+
+Output structured Markdown under the headings: Visible Text, Controls, Layout & State, Ambiguities.`;
+
+  const completion = await client.chat.completions.create({
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+        ],
+      },
+    ],
+    model,
+    temperature: 0.2,
+    max_tokens: Math.min(1200, maxOutputFor(model)),
+    ...reasoningRequestParams(model, 'high').apiParams,
+  });
+  return completion.choices[0]?.message?.content || '';
+}
+
+function buildChatSystemPrompt(mode, criteria, hasImage) {  if (mode === 'solo') {
     return `You are Test-CaseAI, a general-purpose AI assistant inside a QA test-management app.
 Answer directly and helpfully. Use Markdown formatting (headings, bullets, code fences) where it improves readability.
 Keep answers focused and reasonably concise. You are NOT restricted to any project context in this mode.`;

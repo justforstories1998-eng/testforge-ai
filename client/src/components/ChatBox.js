@@ -62,6 +62,7 @@ function ChatBox({
   const [input, setInput] = useState('');
   const [image, setImage] = useState(null); // { dataUrl, name }
   const [sending, setSending] = useState(false);
+  const [sendingImage, setSendingImage] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
 
@@ -99,24 +100,58 @@ function ChatBox({
   );
 
   // ─── Image handling (paste, drop, picker) ──────────────────────
+  // Oversized screenshots are downscaled (longest edge 2048px) so text
+  // stays legible to the vision model without blowing past size limits.
+  // PNG is preferred (sharper text); JPEG fallback if still too large.
+  const fileToDataUrl = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Could not read the image file.'));
+      reader.readAsDataURL(file);
+    });
+
+  const processImageFile = useCallback(async (file) => {
+    const MAX_EDGE = 2048;
+    const bitmap = await createImageBitmap(file).catch(() => null);
+    if (!bitmap || Math.max(bitmap.width, bitmap.height) <= MAX_EDGE) {
+      if (bitmap) bitmap.close();
+      if (file.size > MAX_IMAGE_BYTES) {
+        throw new Error('Image is too large. Maximum size is 6 MB.');
+      }
+      return fileToDataUrl(file);
+    }
+    const scale = MAX_EDGE / Math.max(bitmap.width, bitmap.height);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const pngBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (pngBlob && pngBlob.size <= MAX_IMAGE_BYTES) return fileToDataUrl(pngBlob);
+    const jpegBlob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', 0.9)
+    );
+    if (jpegBlob && jpegBlob.size <= MAX_IMAGE_BYTES) return fileToDataUrl(jpegBlob);
+    throw new Error('Image is too large, even resized. Maximum size is 6 MB.');
+  }, []);
+
   const attachFile = useCallback(
-    (file) => {
+    async (file) => {
       if (!file) return;
       if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
         pushSystemNote('Only PNG, JPEG, GIF or WebP images are supported.');
         return;
       }
-      if (file.size > MAX_IMAGE_BYTES) {
-        pushSystemNote('Image is too large. Maximum size is 6 MB.');
-        return;
+      try {
+        const dataUrl = await processImageFile(file);
+        setImage({ dataUrl, name: file.name || 'image' });
+      } catch (err) {
+        pushSystemNote(err?.message || 'Could not attach the image.');
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImage({ dataUrl: reader.result, name: file.name || 'image' });
-      };
-      reader.readAsDataURL(file);
     },
-    [pushSystemNote]
+    [pushSystemNote, processImageFile]
   );
 
   const handlePaste = (e) => {
@@ -161,6 +196,7 @@ function ChatBox({
         setImage(null);
       }
       setSending(true);
+      setSendingImage(!!img);
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -229,6 +265,7 @@ function ChatBox({
         }
       } finally {
         setSending(false);
+        setSendingImage(false);
         abortRef.current = null;
         stickRef.current = true;
       }
@@ -568,7 +605,7 @@ function ChatBox({
             </span>
             <div className="chat-bubble chat-thinking">
               <FaSpinner className="groq-spin" aria-hidden="true" />
-              <span>Thinking…</span>
+              <span>{sendingImage ? 'Analyzing image in depth…' : 'Thinking…'}</span>
               <button type="button" className="btn btn-ghost btn-sm" onClick={stop}>
                 <FaStop /> Stop
               </button>

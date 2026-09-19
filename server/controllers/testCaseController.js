@@ -5,6 +5,7 @@ const {
   getRateLimitStatus: getGroqRateLimitStatus,
   checkGroqConnection,
   chatWithGroq,
+  analyzeImageWithGroq,
   validateChatImage,
   extractTestCasesJson,
   formatChatTestCases,
@@ -122,11 +123,32 @@ exports.chatWithAI = async (req, res) => {
     const systemPrompt =
       mode === 'solo' ? buildSoloPrompt() : buildCriteriaPrompt(criteria, !!image);
 
+    // Image turns always run deep: a verbatim visual analysis first
+    // (pass 1), then the answer grounded in it (pass 2). This is slower
+    // on purpose — accuracy over speed for visual input.
+    let visualAnalysis = '';
+    let effectiveReasoning = reasoning;
+    if (image) {
+      effectiveReasoning = 'high';
+      try {
+        visualAnalysis = await analyzeImageWithGroq(image, { model });
+      } catch (analysisError) {
+        console.error('⚠️ Visual analysis pass failed, continuing single-pass:', analysisError.message);
+      }
+    }
+
     // Qwen exposes reasoning as on/off on Groq; Low/Medium/High refine depth
     // through this instruction (gpt-oss gets a native reasoning_effort param).
-    const { promptHint } = reasoningRequestParams(model, reasoning);
+    const { promptHint } = reasoningRequestParams(model, effectiveReasoning);
+    const imageProtocol = image
+      ? '\n\nIMAGE PROTOCOL: 1) Re-check the attached image against the visual analysis below. 2) Quote exact labels in your answer. 3) Never invent controls or text not present in the analysis.'
+      : '';
     const groqMessages = [
-      { role: 'system', content: promptHint ? `${systemPrompt}\n\nStyle: ${promptHint}` : systemPrompt },
+      {
+        role: 'system',
+        content:
+          (promptHint ? `${systemPrompt}\n\nStyle: ${promptHint}` : systemPrompt) + imageProtocol,
+      },
     ];
     for (const m of cleanHistory) {
       groqMessages.push({
@@ -137,11 +159,14 @@ exports.chatWithAI = async (req, res) => {
       });
     }
     if (image) {
+      const groundedText = visualAnalysis
+        ? `[Authoritative visual analysis of the attached image — treat quoted labels as exact and ground every claim in it:]\n${visualAnalysis}\n\n[User request:]\n${cleanText || 'Analyze this image.'}`
+        : cleanText || 'Analyze this image.';
       groqMessages.push({
         role: 'user',
         content: [
-          { type: 'text', text: cleanText || 'Analyze this image.' },
-          { type: 'image_url', image_url: { url: image } },
+          { type: 'text', text: groundedText },
+          { type: 'image_url', image_url: { url: image, detail: 'high' } },
         ],
       });
     } else {
@@ -154,7 +179,7 @@ exports.chatWithAI = async (req, res) => {
         model,
         temperature: mode === 'solo' ? 0.7 : 0.5,
         maxTokens: 6000,
-        reasoning,
+        reasoning: effectiveReasoning,
       });
     } catch (groqError) {
       if (/rate limit|429|rate_limit|request too large|quota/i.test(groqError.message || '')) {
@@ -203,7 +228,7 @@ exports.chatWithAI = async (req, res) => {
         return res.status(200).json({
           success: true,
           model: result.model,
-          reasoning,
+          reasoning: effectiveReasoning,
           reply,
           truncated,
           testCases: rows,
@@ -216,7 +241,7 @@ exports.chatWithAI = async (req, res) => {
     return res.status(200).json({
       success: true,
       model: result.model,
-      reasoning,
+      reasoning: effectiveReasoning,
       reply,
       truncated,
       testCases: null,

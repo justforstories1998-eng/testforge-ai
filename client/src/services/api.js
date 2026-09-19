@@ -91,11 +91,12 @@ export const getModels = async () => {
 };
 
 // Chat with the AI assistant. Supports abort via AbortSignal (Stop button).
-// Payload: { model, mode, acceptanceCriteria, meta, history, text, image }
+// Payload: { model, mode, reasoning, acceptanceCriteria, meta, history, text, image }
+// Timeout is generous: image turns run two analysis passes plus deep reasoning.
 export const chatWithAI = async (payload, { signal } = {}) => {
   try {
     const response = await api.post('/testcases/chat', payload, {
-      timeout: 120000,
+      timeout: 180000,
       signal,
     });
     return response.data;
