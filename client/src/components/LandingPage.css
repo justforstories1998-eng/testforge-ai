@@ -161,6 +161,8 @@
   color: #0f172a;
   margin: 0;
   max-width: 1000px;
+  text-wrap: balance;
+  overflow-wrap: break-word;
   animation: fade-rise 0.8s ease-out both;
 }
 
@@ -177,6 +179,8 @@
   color: hsl(215, 25%, 32%);
   max-width: 670px;
   margin: 28px 0 0;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
   animation: fade-rise 0.8s ease-out 0.2s both;
 }
 

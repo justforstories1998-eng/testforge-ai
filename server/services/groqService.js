@@ -1197,6 +1197,7 @@ async function chatWithGroq(messages, options = {}) {
   return {
     model,
     content: completion.choices[0]?.message?.content || '',
+    finishReason: completion.choices[0]?.finish_reason || null,
   };
 }
 
@@ -1218,36 +1219,148 @@ function validateChatImage(dataUrl) {
 }
 
 // Extract a testcases-json fenced block from free-form model output.
+// Tolerates TRUNCATED output (missing closing fence / cut-off mid-JSON):
+// complete scenario objects are salvaged instead of dropping everything.
 // Returns a validated [{ title, scenarioType, steps: [{action, expected}] }]
-// array, or null when the model produced plain prose.
+// array, or null when nothing usable was produced.
 function extractTestCasesJson(text) {
   if (!text) return null;
   const fence =
-    text.match(/```testcases-json\s*([\s\S]*?)\s*```/i) ||
-    text.match(/```json\s*([\s\S]*?)\s*```/i);
+    text.match(/```testcases-json\s*([\s\S]*?)(?:\s*```|$)/i) ||
+    text.match(/```json\s*([\s\S]*?)(?:\s*```|$)/i);
   if (!fence) return null;
-  let parsed;
+  const scenarios = salvageScenarioObjects(fence[1]);
+  return scenarios.length > 0 ? scenarios : null;
+}
+
+// Brace-scan an (optionally truncated) JSON array body and return every
+// complete, valid scenario found, in order. String-aware: braces inside
+// quoted strings and escaped quotes are handled. A scenario cut off
+// mid-stream still yields its complete steps.
+function salvageScenarioObjects(body) {
+  const allowed = ['Positive', 'Negative', 'Boundary', 'Edge'];
+  const found = [];
+  let text = String(body || '').trim();
+  if (text.startsWith('[')) text = text.slice(1);
+
+  // Record every closed {...} span with the depth it closes back to
+  // (0 = scenario level, 1 = step level). Unclosed tail is handled below.
+  const spans = [];
+  const stack = [];
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escape) escape = false;
+      else if (ch === '\\') escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === '{') {
+      stack.push(i);
+    } else if (ch === '}') {
+      if (stack.length === 0) continue;
+      const start = stack.pop();
+      spans.push({ start, end: i + 1, depth: stack.length });
+    }
+  }
+
+  const pushScenario = (sc) => {
+    if (sc && found.length < 8) found.push(sc);
+  };
+
+  // Complete top-level scenarios first.
+  for (const span of spans) {
+    if (span.depth !== 0) continue;
+    pushScenario(tryParseScenario(text.slice(span.start, span.end), allowed));
+  }
+
+  // Trailing unclosed scenario (cut off mid-generation): recover its
+  // complete steps plus title/type from the partial head.
+  if (stack.length > 0) {
+    const tailStart = stack[0];
+    const alreadyCovered = spans.some(
+      (s) => s.depth === 0 && s.start === tailStart
+    );
+    if (!alreadyCovered) {
+      const tail = tryParsePartialScenario(text, tailStart, spans, allowed);
+      pushScenario(tail);
+    }
+  }
+
+  return found;
+}
+
+// Recover {title, scenarioType, complete steps} from an unclosed scenario
+// starting at tailStart. Step spans are the depth-1 spans inside it.
+function tryParsePartialScenario(text, tailStart, spans, allowed) {
+  const head = text.slice(tailStart, tailStart + 600);
+  const titleMatch = head.match(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if (!titleMatch) return null;
+  let title;
   try {
-    parsed = JSON.parse(fence[1].trim());
+    title = JSON.parse(`"${titleMatch[1]}"`);
   } catch {
     return null;
   }
-  if (!Array.isArray(parsed) || parsed.length === 0) return null;
-  const cleaned = [];
-  for (const item of parsed) {
-    if (!item || typeof item.title !== 'string' || !Array.isArray(item.steps)) continue;
-    const steps = item.steps
-      .filter((s) => s && (s.action || s.expected))
-      .map((s) => ({
-        action: String(s.action || 'Perform the test action.'),
-        expected: String(s.expected || 'Verify the expected outcome.'),
-      }));
-    if (steps.length === 0) continue;
-    const allowed = ['Positive', 'Negative', 'Boundary', 'Edge'];
-    const scenarioType = allowed.includes(item.scenarioType) ? item.scenarioType : 'Positive';
-    cleaned.push({ title: ensureVerifyPrefix(item.title), scenarioType, steps });
+  const typeMatch = head.match(/"scenarioType"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  const rawType = typeMatch ? typeMatch[1] : 'Positive';
+
+  const steps = [];
+  for (const span of spans) {
+    if (span.depth !== 1 || span.start < tailStart) continue;
+    const step = tryParseStep(text.slice(span.start, span.end));
+    if (step) steps.push(step);
+    if (steps.length >= 8) break;
   }
-  return cleaned.length > 0 ? cleaned : null;
+  if (steps.length === 0) return null;
+  return {
+    title: ensureVerifyPrefix(title),
+    scenarioType: allowed.includes(rawType) ? rawType : 'Positive',
+    steps,
+  };
+}
+
+function tryParseStep(src) {
+  let obj;
+  try {
+    obj = JSON.parse(src);
+  } catch {
+    return null;
+  }
+  if (!obj || typeof obj !== 'object' || (!obj.action && !obj.expected)) return null;
+  return {
+    action: String(obj.action || 'Perform the test action.'),
+    expected: String(obj.expected || 'Verify the expected outcome.'),
+  };
+}
+
+function tryParseScenario(src, allowed) {
+  let obj;
+  try {
+    obj = JSON.parse(src);
+  } catch {
+    return null;
+  }
+  if (!obj || typeof obj.title !== 'string' || !Array.isArray(obj.steps)) return null;
+  const steps = [];
+  for (const s of obj.steps) {
+    if (!s || typeof s !== 'object' || (!s.action && !s.expected)) continue;
+    steps.push({
+      action: String(s.action || 'Perform the test action.'),
+      expected: String(s.expected || 'Verify the expected outcome.'),
+    });
+    if (steps.length >= 8) break;
+  }
+  if (steps.length === 0) return null;
+  return {
+    title: ensureVerifyPrefix(obj.title),
+    scenarioType: allowed.includes(obj.scenarioType) ? obj.scenarioType : 'Positive',
+    steps,
+  };
 }
 
 // Format parsed chat cases into the app's flat row shape

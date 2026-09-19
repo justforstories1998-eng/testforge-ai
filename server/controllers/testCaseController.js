@@ -168,6 +168,9 @@ exports.chatWithAI = async (req, res) => {
     // no reformatting needed by the user.
     let rows = null;
     let reply = result.content;
+    const fenceOpened = /```testcases-json/i.test(result.content || '');
+    const fenceClosed = /```testcases-json[\s\S]*?```/i.test(result.content || '');
+    const truncated = result.finishReason === 'length' || (fenceOpened && !fenceClosed);
     if (mode === 'criteria') {
       const parsed = extractTestCasesJson(result.content);
       if (parsed) {
@@ -189,13 +192,20 @@ exports.chatWithAI = async (req, res) => {
         const headerRows = rows.filter((tc) => tc.workItemType === 'Test Case').length;
         reply = result.content.replace(
           /```testcases-json[\s\S]*?```/gi,
-          `> ✅ Generated ${headerRows} test scenario(s) — loaded into Session Results below.`
+          truncated
+            ? `> ⚠️ Output was cut off — showing ${headerRows} complete scenario(s). Loaded into Session Results below; ask for fewer scenarios per message for full results.`
+            : `> ✅ Generated ${headerRows} test scenario(s) — loaded into Session Results below.`
         );
+        // Truncated without a closing fence: strip the dangling fence opener.
+        if (truncated && !fenceClosed) {
+          reply = reply.replace(/```testcases-json[\s\S]*$/i, '').trim();
+        }
         return res.status(200).json({
           success: true,
           model: result.model,
           reasoning,
           reply,
+          truncated,
           testCases: rows,
           count: rows.length,
           scenarios: headerRows,
@@ -208,6 +218,7 @@ exports.chatWithAI = async (req, res) => {
       model: result.model,
       reasoning,
       reply,
+      truncated,
       testCases: null,
       count: 0,
       scenarios: 0,
@@ -242,7 +253,7 @@ When the user asks for TEST CASES (including "from this image"), output them in 
 \`\`\`testcases-json
 [{"title":"Verify ...","scenarioType":"Positive","steps":[{"action":"...","expected":"..."}]}]
 \`\`\`
-Rules: every title starts with "Verify"; 3-6 concrete steps per scenario; brief prose OUTSIDE the fence only.
+Rules: every title starts with "Verify"; 3-4 concrete steps per scenario; AT MOST 2 scenarios per response (if asked for more, generate the first 2 and invite the user to say "continue" for the next batch); brief prose OUTSIDE the fence only.
 For criteria/user-story requests, answer in clear Markdown the user can insert back into the form.`;
 }
 

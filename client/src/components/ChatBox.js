@@ -196,11 +196,21 @@ function ChatBox({
           testInfo,
         });
 
+        if (res.truncated) {
+          pushSystemNote(
+            testInfo
+              ? 'Output was cut off by length limits — showing complete scenarios only. Ask for fewer scenarios per message, or say “continue” to append more.'
+              : 'Output was cut off before any complete scenario — ask for fewer scenarios per message.'
+          );
+        }
+
         if (testInfo) {
+          const isContinue = /continue|more|next|remaining|rest of/i.test(text);
           onTestCasesGenerated(res.testCases, {
             scenarios: testInfo.scenarios,
             count: testInfo.count,
             model: res.model || model,
+            append: isContinue,
           });
         }
       } catch (err) {
@@ -222,7 +232,7 @@ function ChatBox({
         stickRef.current = true;
       }
     },
-    [input, image, sending, aiReady, visionOn, messages, pushMessage, model, mode, reasoning, criteria, meta, onTestCasesGenerated]
+    [input, image, sending, aiReady, visionOn, messages, pushMessage, pushSystemNote, model, mode, reasoning, criteria, meta, onTestCasesGenerated]
   );
 
   const stop = () => {

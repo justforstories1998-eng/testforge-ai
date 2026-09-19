@@ -262,21 +262,35 @@ const fetchAll = useCallback(async () => {
 
   // Chat-generated test cases land in the session results, exactly like
   // form-generated ones (same row shape, already saved server-side).
+  // A "continue / more / next" follow-up APPENDS instead of replacing.
   const handleChatTestCases = useCallback(
     async (chatTestCases, info = {}) => {
       if (!chatTestCases?.length) return;
-      setTestCases(chatTestCases);
-      setChatExport({
-        testCases: chatTestCases,
-        scenarios: info.scenarios || 0,
-        count: info.count || chatTestCases.length,
-        model: info.model || modelRef.current,
+      const append = !!info.append;
+      setTestCases((prev) => (append ? [...prev, ...chatTestCases] : chatTestCases));
+      setChatExport((prev) => {
+        if (append && prev?.testCases?.length) {
+          const merged = [...prev.testCases, ...chatTestCases];
+          return {
+            testCases: merged,
+            scenarios: (prev.scenarios || 0) + (info.scenarios || 0),
+            count: merged.length,
+            model: info.model || modelRef.current,
+          };
+        }
+        return {
+          testCases: chatTestCases,
+          scenarios: info.scenarios || 0,
+          count: info.count || chatTestCases.length,
+          model: info.model || modelRef.current,
+        };
       });
       await fetchAll();
       const usedModel = info.model || modelRef.current;
       const found = models.find((m) => m.id === usedModel);
+      const verb = append ? 'appended' : 'generated';
       setSuccess(
-        `Chat generated ${info.scenarios || 0} test scenario(s) totalling ${info.count || chatTestCases.length} rows with ${found?.label || usedModel}`
+        `Chat ${verb} ${info.scenarios || 0} test scenario(s) totalling ${info.count || chatTestCases.length} rows with ${found?.label || usedModel}`
       );
     },
     [fetchAll, models]

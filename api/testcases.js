@@ -95,33 +95,134 @@ function validateChatImage(dataUrl) {
   return { mime: match[1], approxBytes };
 }
 
-// Extract a testcases-json fenced block; null when the model wrote prose.
+// Extract a testcases-json fenced block; salvages complete scenarios from
+// TRUNCATED output instead of dropping everything. Mirrors
+// server/services/groqService.js (keep in sync).
 function extractTestCasesJson(text) {
   if (!text) return null;
-  const fence = text.match(/```testcases-json\s*([\s\S]*?)\s*```/i)
-    || text.match(/```json\s*([\s\S]*?)\s*```/i);
+  const fence = text.match(/```testcases-json\s*([\s\S]*?)(?:\s*```|$)/i)
+    || text.match(/```json\s*([\s\S]*?)(?:\s*```|$)/i);
   if (!fence) return null;
-  let parsed;
-  try { parsed = JSON.parse(fence[1].trim()); } catch { return null; }
-  if (!Array.isArray(parsed) || parsed.length === 0) return null;
+  const scenarios = salvageScenarioObjects(fence[1]);
+  return scenarios.length > 0 ? scenarios : null;
+}
+
+function salvageScenarioObjects(body) {
   const allowed = ['Positive', 'Negative', 'Boundary', 'Edge'];
-  const cleaned = [];
-  for (const item of parsed) {
-    if (!item || typeof item.title !== 'string' || !Array.isArray(item.steps)) continue;
-    const steps = item.steps
-      .filter((s) => s && (s.action || s.expected))
-      .map((s) => ({
-        action: String(s.action || 'Perform the test action.'),
-        expected: String(s.expected || 'Verify the expected outcome.'),
-      }));
-    if (steps.length === 0) continue;
-    cleaned.push({
-      title: item.title.trim().toLowerCase().startsWith('verify') ? item.title.trim() : `Verify ${item.title.trim()}`,
-      scenarioType: allowed.includes(item.scenarioType) ? item.scenarioType : 'Positive',
-      steps,
-    });
+  const found = [];
+  let text = String(body || '').trim();
+  if (text.startsWith('[')) text = text.slice(1);
+
+  const spans = [];
+  const stack = [];
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escape) escape = false;
+      else if (ch === '\\') escape = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{') {
+      stack.push(i);
+    } else if (ch === '}') {
+      if (stack.length === 0) continue;
+      const start = stack.pop();
+      spans.push({ start, end: i + 1, depth: stack.length });
+    }
   }
-  return cleaned.length > 0 ? cleaned : null;
+
+  const pushScenario = (sc) => {
+    if (sc && found.length < 8) found.push(sc);
+  };
+
+  for (const span of spans) {
+    if (span.depth !== 0) continue;
+    pushScenario(tryParseScenario(text.slice(span.start, span.end), allowed));
+  }
+
+  if (stack.length > 0) {
+    const tailStart = stack[0];
+    const alreadyCovered = spans.some(
+      (s) => s.depth === 0 && s.start === tailStart
+    );
+    if (!alreadyCovered) {
+      pushScenario(tryParsePartialScenario(text, tailStart, spans, allowed));
+    }
+  }
+
+  return found;
+}
+
+function tryParsePartialScenario(text, tailStart, spans, allowed) {
+  const head = text.slice(tailStart, tailStart + 600);
+  const titleMatch = head.match(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if (!titleMatch) return null;
+  let title;
+  try {
+    title = JSON.parse(`"${titleMatch[1]}"`);
+  } catch {
+    return null;
+  }
+  const typeMatch = head.match(/"scenarioType"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  const rawType = typeMatch ? typeMatch[1] : 'Positive';
+
+  const steps = [];
+  for (const span of spans) {
+    if (span.depth !== 1 || span.start < tailStart) continue;
+    const step = tryParseStep(text.slice(span.start, span.end));
+    if (step) steps.push(step);
+    if (steps.length >= 8) break;
+  }
+  if (steps.length === 0) return null;
+  const cleanTitle = String(title).trim();
+  return {
+    title: cleanTitle.toLowerCase().startsWith('verify') ? cleanTitle : `Verify ${cleanTitle}`,
+    scenarioType: allowed.includes(rawType) ? rawType : 'Positive',
+    steps,
+  };
+}
+
+function tryParseStep(src) {
+  let obj;
+  try {
+    obj = JSON.parse(src);
+  } catch {
+    return null;
+  }
+  if (!obj || typeof obj !== 'object' || (!obj.action && !obj.expected)) return null;
+  return {
+    action: String(obj.action || 'Perform the test action.'),
+    expected: String(obj.expected || 'Verify the expected outcome.'),
+  };
+}
+
+function tryParseScenario(src, allowed) {
+  let obj;
+  try {
+    obj = JSON.parse(src);
+  } catch {
+    return null;
+  }
+  if (!obj || typeof obj.title !== 'string' || !Array.isArray(obj.steps)) return null;
+  const steps = [];
+  for (const s of obj.steps) {
+    if (!s || typeof s !== 'object' || (!s.action && !s.expected)) continue;
+    steps.push({
+      action: String(s.action || 'Perform the test action.'),
+      expected: String(s.expected || 'Verify the expected outcome.'),
+    });
+    if (steps.length >= 8) break;
+  }
+  if (steps.length === 0) return null;
+  return {
+    title: obj.title.trim().toLowerCase().startsWith('verify') ? obj.title.trim() : `Verify ${obj.title.trim()}`,
+    scenarioType: allowed.includes(obj.scenarioType) ? obj.scenarioType : 'Positive',
+    steps,
+  };
 }
 
 // Initialize Groq client
@@ -399,6 +500,7 @@ async function handleChat(req, res) {
 
     const client = getGroqClient();
     let content;
+    let finishReason = null;
     try {
       const response = await client.chat.completions.create({
         messages: groqMessages,
@@ -408,6 +510,7 @@ async function handleChat(req, res) {
         ...reasoningRequestParams(model, reasoning).apiParams,
       });
       content = response.choices[0]?.message?.content || '';
+      finishReason = response.choices[0]?.finish_reason || null;
     } catch (groqError) {
       if (/rate limit|429|rate_limit|request too large|quota/i.test(groqError.message || '')) {
         return res.status(429).json({ success: false, error: groqError.message, isRateLimitError: true });
@@ -417,6 +520,9 @@ async function handleChat(req, res) {
 
     let rows = null;
     let reply = content;
+    const fenceOpened = /```testcases-json/i.test(content || '');
+    const fenceClosed = /```testcases-json[\s\S]*?```/i.test(content || '');
+    const truncated = finishReason === 'length' || (fenceOpened && !fenceClosed);
     if (mode === 'criteria') {
       const parsed = extractTestCasesJson(content);
       if (parsed) {
@@ -431,16 +537,21 @@ async function handleChat(req, res) {
         const headerRows = rows.filter((tc) => tc.workItemType === 'Test Case').length;
         reply = content.replace(
           /```testcases-json[\s\S]*?```/gi,
-          `> ✅ Generated ${headerRows} test scenario(s) — loaded into Session Results below.`
+          truncated
+            ? `> ⚠️ Output was cut off — showing ${headerRows} complete scenario(s). Loaded into Session Results below; ask for fewer scenarios per message for full results.`
+            : `> ✅ Generated ${headerRows} test scenario(s) — loaded into Session Results below.`
         );
+        if (truncated && !fenceClosed) {
+          reply = reply.replace(/```testcases-json[\s\S]*$/i, '').trim();
+        }
         return res.status(200).json({
-          success: true, model, reasoning, reply, testCases: rows, count: rows.length, scenarios: headerRows,
+          success: true, model, reasoning, reply, truncated, testCases: rows, count: rows.length, scenarios: headerRows,
         });
       }
     }
 
     return res.status(200).json({
-      success: true, model, reasoning, reply, testCases: null, count: 0, scenarios: 0,
+      success: true, model, reasoning, reply, truncated, testCases: null, count: 0, scenarios: 0,
     });
   } catch (error) {
     console.error('❌ Chat error:', error);
@@ -471,7 +582,7 @@ When the user asks for TEST CASES (including "from this image"), output them in 
 \`\`\`testcases-json
 [{"title":"Verify ...","scenarioType":"Positive","steps":[{"action":"...","expected":"..."}]}]
 \`\`\`
-Rules: every title starts with "Verify"; 3-6 concrete steps per scenario; brief prose OUTSIDE the fence only.
+Rules: every title starts with "Verify"; 3-4 concrete steps per scenario; AT MOST 2 scenarios per response (if asked for more, generate the first 2 and invite the user to say "continue" for the next batch); brief prose OUTSIDE the fence only.
 For criteria/user-story requests, answer in clear Markdown the user can insert back into the form.`;
 }
 
